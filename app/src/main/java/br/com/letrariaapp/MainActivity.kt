@@ -13,6 +13,9 @@ import br.com.letrariaapp.ui.features.auth.LoginScreen
 import br.com.letrariaapp.ui.features.auth.RegisterScreen
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import br.com.letrariaapp.ui.features.home.HomeScreen
+import br.com.letrariaapp.ui.features.profile.ProfileScreen // <-- ADICIONE O IMPORT
+import br.com.letrariaapp.ui.features.profile.sampleUser // <-- ADICIONE O IMPORT DOS DADOS DE EXEMPLO
+import br.com.letrariaapp.ui.features.home.sampleUserForHome
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,10 +36,9 @@ fun AppNavigation() {
     NavHost(navController = navController, startDestination = "login") {
 
         composable("login") {
-            LoginScreen( // Supondo que você tenha a LoginScreen
+            LoginScreen(
                 onRegisterClick = { navController.navigate("register") },
                 onLoginClick = { email, password ->
-                    // Navega para a Home e limpa a tela de login do histórico
                     navController.navigate("home") {
                         popUpTo("login") { inclusive = true }
                     }
@@ -45,7 +47,7 @@ fun AppNavigation() {
         }
 
         composable("register") {
-            RegisterScreen( // Supondo que você tenha a RegisterScreen
+            RegisterScreen(
                 onLoginClick = { navController.popBackStack() },
                 onRegisterClick = { nome, email, password ->
                     navController.popBackStack()
@@ -55,13 +57,27 @@ fun AppNavigation() {
 
         composable("home") {
             HomeScreen(
-                onProfileClick = { /* Navegar para perfil */ },
+                // MUDANÇA 1: Adicionando a ação de navegação
+                user = sampleUserForHome, // <-- PASSE O USUÁRIO DE EXEMPLO
+                onProfileClick = { navController.navigate("profile") },
                 onSettingsClick = { /* Navegar para configurações */ },
                 onCreateClubClick = { /* Navegar para criar clube */ },
                 onJoinClubClick = { /* Navegar para procurar clubes */ },
                 onClubClick = { club ->
                     println("Clicou no clube: ${club.name}")
                 }
+            )
+        }
+
+        // MUDANÇA 2: Adicionando a nova rota para a tela de perfil
+        composable("profile") {
+            ProfileScreen(
+                user = sampleUser, // Usando dados de exemplo por enquanto
+                onBackClick = {
+                    // Ação para voltar para a tela anterior
+                    navController.popBackStack()
+                },
+                onSettingsClick = { /* TODO: Abrir menu de configurações */ }
             )
         }
     }

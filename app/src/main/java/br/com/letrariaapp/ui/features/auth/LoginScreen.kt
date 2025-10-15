@@ -2,6 +2,7 @@ package br.com.letrariaapp.ui.features.auth
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +33,23 @@ fun LoginScreen(
 
     // TROCAMOS O 'Box' COM COR SÓLIDA PELO NOSSO COMPONENTE DE IMAGEM DE FUNDO
     AppBackground {
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo_letraria),
+                contentDescription = "Logo Letraria",
+                modifier = Modifier.size(250.dp),
+            )
+        }
+
+
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -40,11 +58,7 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center
         ) {
             // ADICIONE SEU LOGO EM res/drawable
-            Image(
-                painter = painterResource(id = R.drawable.logo_letraria),
-                contentDescription = "Logo Letraria",
-                modifier = Modifier.size(150.dp)
-            )
+
 
             Spacer(modifier = Modifier.height(48.dp))
 
