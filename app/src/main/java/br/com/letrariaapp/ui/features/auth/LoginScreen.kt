@@ -1,115 +1,142 @@
 package br.com.letrariaapp.ui.features.auth
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.letrariaapp.R
-// ADICIONE O IMPORT PARA O NOSSO COMPONENTE DE FUNDO
 import br.com.letrariaapp.ui.components.AppBackground
+import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 
-// Cores do seu design (podem ser movidas para um arquivo de tema)
-val ButtonRed = Color(0xFFE57373)
-val TextColor = Color(0xFF2A3A6A)
+private val ButtonRed = Color(0xFFE57373)
+private val TextColor = Color(0xFF2A3A6A)
 
 @Composable
 fun LoginScreen(
+    viewModel: AuthViewModel,
     onRegisterClick: () -> Unit,
-    onLoginClick: (String, String) -> Unit
+    onLoginSuccess: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    // TROCAMOS O 'Box' COM COR SÓLIDA PELO NOSSO COMPONENTE DE IMAGEM DE FUNDO
-    AppBackground {
+    val authResult by viewModel.authResult.observeAsState(AuthResult.IDLE)
+    val context = LocalContext.current
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.logo_letraria),
-                contentDescription = "Logo Letraria",
-                modifier = Modifier.size(250.dp),
-            )
-        }
-
-
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // ADICIONE SEU LOGO EM res/drawable
-
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = TextColor,
-                    unfocusedBorderColor = TextColor.copy(alpha = 0.5f),
-                    focusedLabelColor = TextColor
-                )
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Senha") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = TextColor,
-                    unfocusedBorderColor = TextColor.copy(alpha = 0.5f),
-                    focusedLabelColor = TextColor
-                )
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = { onLoginClick(email, password) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = ButtonRed)
-            ) {
-                Text("ENTRAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    LaunchedEffect(authResult) {
+        when (val result = authResult) {
+            is AuthResult.SUCCESS -> {
+                // A navegação acontece no onLoginSuccess, não precisamos fazer nada aqui
+                viewModel.resetAuthResult()
             }
+            is AuthResult.ERROR -> {
+                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                viewModel.resetAuthResult()
+            }
+            else -> {}
+        }
+    }
 
-            Spacer(modifier = Modifier.height(16.dp))
+    LoginScreenContent(
+        email = email,
+        onEmailChange = { email = it },
+        password = password,
+        onPasswordChange = { password = it },
+        onLoginClick = { viewModel.login(email, password, onLoginSuccess) },
+        onRegisterClick = onRegisterClick,
+        isLoading = authResult is AuthResult.LOADING
+    )
+}
 
-            TextButton(onClick = onRegisterClick) {
-                Text("Não tem uma conta? Cadastre-se", color = TextColor)
+@Composable
+fun LoginScreenContent(
+    email: String,
+    onEmailChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    onLoginClick: () -> Unit,
+    onRegisterClick: () -> Unit,
+    isLoading: Boolean
+) {
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    AppBackground(backgroundResId = R.drawable.app_background) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.logo_letraria),
+                    contentDescription = "Logo Letraria",
+                    modifier = Modifier.size(250.dp),
+                )
+                Spacer(modifier = Modifier.height(100.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = onEmailChange,
+                        label = { Text("Email") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        enabled = !isLoading
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = onPasswordChange,
+                        label = { Text("Senha") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(image, null) }
+                        },
+                        enabled = !isLoading
+                    )
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Button(
+                        onClick = onLoginClick,
+                        enabled = !isLoading,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ButtonRed)
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                        } else {
+                            Text("ENTRAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TextButton(onClick = onRegisterClick, enabled = !isLoading) {
+                        Text("Não tem uma conta? Cadastre-se", color = TextColor)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -118,5 +145,14 @@ fun LoginScreen(
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview() {
-    LoginScreen(onRegisterClick = {}, onLoginClick = { _, _ -> })
+    LetrariaAppTheme {
+        AppBackground(backgroundResId = R.drawable.app_background) {
+            LoginScreenContent(
+                email = "", onEmailChange = {},
+                password = "", onPasswordChange = {},
+                onLoginClick = {}, onRegisterClick = {},
+                isLoading = false
+            )
+        }
+    }
 }

@@ -1,0 +1,113 @@
+package br.com.letrariaapp.ui.features.auth
+
+import android.util.Log
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+
+sealed class AuthResult {
+    data object IDLE : AuthResult()
+    data object LOADING : AuthResult()
+    data object SUCCESS : AuthResult()
+    data class ERROR(val message: String) : AuthResult()
+}
+
+class AuthViewModel : ViewModel() {
+
+    private val auth = Firebase.auth
+    private val firestore = Firebase.firestore
+
+    private val _authResult = MutableLiveData<AuthResult>(AuthResult.IDLE)
+    val authResult: LiveData<AuthResult> = _authResult
+
+    fun login(email: String, password: String, onLoginSuccess: () -> Unit) {
+        if (email.isBlank() || password.isBlank()) {
+            _authResult.value = AuthResult.ERROR("Preencha todos os campos")
+            return
+        }
+
+        viewModelScope.launch {
+            _authResult.value = AuthResult.LOADING
+            try {
+                val result = auth.signInWithEmailAndPassword(email, password).await()
+                val user = result.user
+                if (user != null && user.isEmailVerified) {
+                    _authResult.value = AuthResult.SUCCESS
+                    onLoginSuccess()
+                } else {
+                    auth.signOut()
+                    _authResult.value = AuthResult.ERROR("Por favor, verifique seu e-mail para continuar.")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro no login", e)
+                _authResult.value = AuthResult.ERROR(e.message ?: "E-mail ou senha incorretos.")
+            }
+        }
+    }
+
+    fun register(name: String, email: String, password: String) {
+        if (name.isBlank() || email.isBlank() || password.isBlank()) {
+            _authResult.value = AuthResult.ERROR("Preencha todos os campos")
+            return
+        }
+        if (password.length < 6) {
+            _authResult.value = AuthResult.ERROR("A senha deve ter pelo menos 6 caracteres")
+            return
+        }
+
+        viewModelScope.launch {
+            _authResult.value = AuthResult.LOADING
+            try {
+                val result = auth.createUserWithEmailAndPassword(email, password).await()
+                val user = result.user
+
+                user?.sendEmailVerification()?.await()
+                Log.d(TAG, "E-mail de verificação enviado.")
+
+                if (user?.uid != null) {
+                    saveUserToFirestore(user.uid, name, email)
+                    _authResult.value = AuthResult.SUCCESS
+                    Log.d(TAG, "Registro realizado com sucesso")
+                } else {
+                    _authResult.value = AuthResult.ERROR("Erro ao obter ID do usuário.")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro no registro", e)
+                _authResult.value = AuthResult.ERROR(e.message ?: "Erro desconhecido ao registrar.")
+            }
+        }
+    }
+
+    private suspend fun saveUserToFirestore(uid: String, name: String, email: String) {
+        val avatarUrl = "https://ui-avatars.com/api/?name=${name.replace(" ", "+")}&background=random"
+        val user = hashMapOf(
+            "uid" to uid,
+            "name" to name,
+            "email" to email,
+            "profilePictureUrl" to avatarUrl,
+            "aboutMe" to "",
+            "friendCount" to 0L,
+            "checklist" to emptyList<Any>(),
+            "clubs" to emptyList<Any>()
+        )
+        firestore.collection("users").document(uid).set(user).await()
+    }
+
+    fun logout() {
+        auth.signOut()
+    }
+
+    fun resetAuthResult() {
+        _authResult.value = AuthResult.IDLE
+    }
+
+    companion object {
+        private const val TAG = "AuthViewModel"
+    }
+}

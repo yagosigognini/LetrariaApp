@@ -1,6 +1,6 @@
 package br.com.letrariaapp.data
 
 data class RatedBook(
-    val book: Book,
-    val rating: Int // Nota de 1 a 5
+    val book: Book? = null, // Usar 'Book?' permite que o valor padrão seja null
+    val rating: Int = 0
 )

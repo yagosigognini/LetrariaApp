@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "449691562635",
+    "project_id": "letraria-d570c",
+    "storage_bucket": "letraria-d570c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:449691562635:android:bf56e45f6f0840979eda8e",
+        "android_client_info": {
+          "package_name": "br.com.letrariaapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPNr7o7j8INb2nsbJ-ZTLVS2W9INHHyLs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

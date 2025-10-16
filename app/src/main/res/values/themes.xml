@@ -24,4 +24,10 @@
         <!-- For light status bar icons on dark status bar -->
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FD8569</item> <item name="windowSplashScreenAnimatedIcon">@mipmap/letraria</item>
+        <item name="postSplashScreenTheme">@style/Theme.LetrariaApp</item>
+    </style>
 </resources>
+
