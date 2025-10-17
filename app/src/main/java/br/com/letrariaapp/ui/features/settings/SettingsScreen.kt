@@ -1,5 +1,7 @@
 package br.com.letrariaapp.ui.features.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,41 +12,60 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import br.com.letrariaapp.R // Import para R.drawable
+import br.com.letrariaapp.R
 import br.com.letrariaapp.ui.components.AppBackground
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
+import br.com.letrariaapp.ui.features.settings.SettingsScreen
+import br.com.letrariaapp.ui.features.settings.SettingsViewModel
 
 // --- TELA "INTELIGENTE" (STATEFUL) ---
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(),
     onBackClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onDeleteAccount: () -> Unit // ✅ Ação para deletar a conta
 ) {
-    val userEmail by remember(viewModel.userEmail) {
-        mutableStateOf(viewModel.userEmail)
+    val userEmail by remember { mutableStateOf(viewModel.userEmail) }
+    val context = LocalContext.current
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // ✅ Mostra a caixa de diálogo se o estado for verdadeiro
+    if (showDeleteDialog) {
+        DeleteAccountDialog(
+            onConfirm = {
+                showDeleteDialog = false
+                onDeleteAccount() // Chama a função do ViewModel
+            },
+            onDismiss = { showDeleteDialog = false }
+        )
     }
 
     SettingsScreenContent(
         userEmail = userEmail,
         onBackClick = onBackClick,
-        onPasswordResetClick = { /* TODO */ },
+        onPasswordResetClick = { viewModel.sendPasswordResetEmail() },
         onThemeChangeClick = { /* TODO */ },
-        onFeedbackClick = { /* TODO */ },
+        onFeedbackClick = {
+            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("mailto:")
+                putExtra(Intent.EXTRA_EMAIL, arrayOf("feedback@letrariaapp.com"))
+                putExtra(Intent.EXTRA_SUBJECT, "Feedback sobre o LetrariaApp")
+            }
+            try { context.startActivity(intent) } catch (e: Exception) { /* Lida com erro */ }
+        },
         onTermsClick = { /* TODO */ },
         onLogoutClick = onLogoutClick,
-        onDeleteAccountClick = { /* TODO */ }
+        onDeleteAccountClick = { showDeleteDialog = true } // ✅ Apenas mostra o diálogo
     )
 }
 
@@ -133,15 +154,34 @@ fun SettingsScreenContent(
     }
 }
 
+// ✅ NOVO COMPONENTE: Caixa de diálogo para confirmação
+@Composable
+fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Excluir Conta") },
+        text = { Text("Você tem certeza? Esta ação é permanente e não pode ser desfeita. Todos os seus dados serão apagados.") },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Excluir")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
 
 // --- COMPONENTES AUXILIARES ---
-
 @Composable
 private fun InfoRow(label: String, value: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -154,10 +194,7 @@ private fun InfoRow(label: String, value: String) {
 @Composable
 private fun ClickableRow(label: String, value: String? = null, onClick: () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 16.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -174,19 +211,15 @@ private fun ClickableRow(label: String, value: String? = null, onClick: () -> Un
 }
 
 // --- PREVIEW ---
-
 @Preview(showBackground = true)
 @Composable
 fun SettingsScreenPreview() {
     LetrariaAppTheme {
         SettingsScreenContent(
             userEmail = "fulanodetal@gmail.com",
-            onBackClick = {},
-            onPasswordResetClick = {},
-            onThemeChangeClick = {},
-            onFeedbackClick = {},
-            onTermsClick = {},
-            onLogoutClick = {},
+            onBackClick = {}, onPasswordResetClick = {},
+            onThemeChangeClick = {}, onFeedbackClick = {},
+            onTermsClick = {}, onLogoutClick = {},
             onDeleteAccountClick = {}
         )
     }

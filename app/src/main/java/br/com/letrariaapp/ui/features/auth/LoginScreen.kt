@@ -24,9 +24,8 @@ import androidx.compose.ui.unit.sp
 import br.com.letrariaapp.R
 import br.com.letrariaapp.ui.components.AppBackground
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
-
-private val ButtonRed = Color(0xFFE57373)
-private val TextColor = Color(0xFF2A3A6A)
+import br.com.letrariaapp.ui.theme.ButtonRed
+import br.com.letrariaapp.ui.theme.TextColor
 
 @Composable
 fun LoginScreen(

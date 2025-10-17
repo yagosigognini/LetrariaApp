@@ -26,13 +26,10 @@ import br.com.letrariaapp.ui.features.profile.ProfileScreen
 import br.com.letrariaapp.ui.features.profile.ProfileViewModel
 import br.com.letrariaapp.ui.features.profile.UpdateStatus
 import br.com.letrariaapp.ui.features.settings.SettingsScreen
+import br.com.letrariaapp.ui.features.settings.SettingsViewModel // ✅ IMPORT ADICIONADO
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
-
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,9 +73,6 @@ fun AppNavigation() {
         }
 
         composable("home") {
-            // ✅ CORREÇÃO APLICADA:
-            // A chamada para HomeScreen não passa mais o 'user'.
-            // Ela agora usa o HomeViewModel internamente para buscar os dados.
             HomeScreen(
                 onProfileClick = {
                     val userId = Firebase.auth.currentUser?.uid
@@ -86,7 +80,6 @@ fun AppNavigation() {
                         navController.navigate("profile/$userId")
                     }
                 },
-                // ✅ MUDANÇA: O botão de engrenagem agora navega para a tela de configurações
                 onSettingsClick = { navController.navigate("settings") },
                 onCreateClubClick = { navController.navigate("create_club") },
                 onJoinClubClick = { /* TODO */ },
@@ -143,16 +136,37 @@ fun AppNavigation() {
             }
         }
 
-        // ✅ NOVA ROTA: Adicionada a rota para a tela de Configurações
         composable("settings") {
+            val settingsViewModel: SettingsViewModel = viewModel()
+            val toastMessage by settingsViewModel.toastMessage.observeAsState()
+            val accountDeleted by settingsViewModel.accountDeleted.observeAsState(false)
+            val context = LocalContext.current
+
+            LaunchedEffect(toastMessage) {
+                toastMessage?.let { message ->
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    settingsViewModel.onToastMessageShown()
+                }
+            }
+
+            LaunchedEffect(accountDeleted) {
+                if (accountDeleted) {
+                    navController.navigate("login") {
+                        popUpTo(0) // Limpa toda a pilha de navegação
+                    }
+                }
+            }
+
             SettingsScreen(
+                viewModel = settingsViewModel,
                 onBackClick = { navController.popBackStack() },
                 onLogoutClick = {
                     authViewModel.logout()
                     navController.navigate("login") {
                         popUpTo(0)
                     }
-                }
+                },
+                onDeleteAccount = { settingsViewModel.deleteAccount() }
             )
         }
 
