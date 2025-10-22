@@ -17,7 +17,6 @@ class SettingsViewModel : ViewModel() {
     private val _toastMessage = MutableLiveData<String?>(null)
     val toastMessage: LiveData<String?> = _toastMessage
 
-    // NOVO: LiveData para sinalizar que a conta foi excluída
     private val _accountDeleted = MutableLiveData<Boolean>(false)
     val accountDeleted: LiveData<Boolean> = _accountDeleted
 
@@ -25,10 +24,23 @@ class SettingsViewModel : ViewModel() {
         get() = auth.currentUser?.email ?: "Carregando..."
 
     fun sendPasswordResetEmail() {
-        // ... (código existente)
+        val email = auth.currentUser?.email
+        if (!email.isNullOrBlank()) {
+            auth.sendPasswordResetEmail(email)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        _toastMessage.value = "E-mail de redefinição de senha enviado!"
+                        Log.d("SettingsViewModel", "Password reset email sent.")
+                    } else {
+                        _toastMessage.value = "Falha ao enviar e-mail. Tente novamente."
+                        Log.w("SettingsViewModel", "sendPasswordResetEmail:failure", task.exception)
+                    }
+                }
+        } else {
+            _toastMessage.value = "Não foi possível encontrar o e-mail do usuário."
+        }
     }
 
-    // NOVO: Função para deletar a conta do usuário
     fun deleteAccount() {
         viewModelScope.launch {
             val user = auth.currentUser
@@ -40,7 +52,7 @@ class SettingsViewModel : ViewModel() {
             try {
                 user.delete().await()
                 Log.d("SettingsViewModel", "Conta do usuário excluída com sucesso.")
-                _accountDeleted.value = true // Sinaliza para a UI que a exclusão foi bem-sucedida
+                _accountDeleted.value = true
             } catch (e: Exception) {
                 Log.w("SettingsViewModel", "Erro ao excluir conta:", e)
                 if (e is FirebaseAuthRecentLoginRequiredException) {

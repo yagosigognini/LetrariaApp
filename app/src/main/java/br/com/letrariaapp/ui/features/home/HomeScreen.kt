@@ -49,11 +49,13 @@ fun HomeScreen(
     onClubClick: (BookClub) -> Unit
 ) {
     val user by viewModel.user.observeAsState()
+    // ✅ OBSERVANDO A NOVA LISTA DE CLUBES
+    val clubs by viewModel.clubs.observeAsState(emptyList())
 
     HomeScreenContent(
-        user = user, // Passa o usuário do ViewModel para a tela de UI
-        quote = sampleQuote, // Mantemos dados de exemplo por enquanto
-        clubs = sampleClubsList, // Mantemos dados de exemplo por enquanto
+        user = user,
+        quote = sampleQuote,
+        clubs = clubs, // ✅ PASSANDO A LISTA REAL
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
         onCreateClubClick = onCreateClubClick,
@@ -99,6 +101,7 @@ fun HomeScreenContent(
             }
             item { Spacer(modifier = Modifier.height(24.dp)) }
             item { ActionButtons(onCreateClubClick, onJoinClubClick) }
+            item { Spacer(modifier = Modifier.height(42.dp)) }
         }
     }
 }
@@ -175,7 +178,7 @@ fun ActionButtons(onCreateClubClick: () -> Unit, onJoinClubClick: () -> Unit) {
                 .height(50.dp),
             colors = ButtonDefaults.buttonColors(containerColor = homeButtonColor)
         ) {
-            Text("CRIAR NOVO CLUBE", color = Color.White)
+            Text("CRIAR CLUBE", color = Color.White)
         }
         Button(
             onClick = onJoinClubClick,
@@ -184,7 +187,7 @@ fun ActionButtons(onCreateClubClick: () -> Unit, onJoinClubClick: () -> Unit) {
                 .height(50.dp),
             colors = ButtonDefaults.buttonColors(containerColor = homeButtonColor)
         ) {
-            Text("PARTICIPAR DE CLUBES", color = Color.White)
+            Text("BUSCAR CLUBES", color = Color.White)
         }
     }
 }

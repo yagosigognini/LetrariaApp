@@ -1,16 +1,11 @@
 package br.com.letrariaapp.ui.features.profile
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -21,231 +16,208 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.letrariaapp.R
-import br.com.letrariaapp.data.*
+import br.com.letrariaapp.data.BookClub
+import br.com.letrariaapp.data.User
+import br.com.letrariaapp.data.sampleClubsList
+import br.com.letrariaapp.data.sampleUser
 import br.com.letrariaapp.ui.components.AppBackground
 import br.com.letrariaapp.ui.components.ClubsSection
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import coil.compose.AsyncImage
-import android.util.Log
 
-// --- TELA "INTELIGENTE" (STATEFUL) ---
-// É chamada pela navegação e gerencia a lógica e o estado.
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = viewModel(),
     userId: String?,
     onBackClick: () -> Unit,
     onEditProfileClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onClubClick: (BookClub) -> Unit // ✅ PARÂMETRO ADICIONADO
 ) {
-    // NOVO LOG DE DIAGNÓSTICO
-    Log.d("ProfileScreenDebug", "A função ProfileScreen foi chamada. UserID recebido: $userId")
-
-    // Pede ao ViewModel para carregar os dados
     LaunchedEffect(key1 = userId) {
-        // NOVO LOG DE DIAGNÓSTICO
-        Log.d("ProfileScreenDebug", "O LaunchedEffect foi ativado, chamando viewModel.loadUserProfile...")
         viewModel.loadUserProfile(userId)
     }
 
-    // Observa os dados vindos do ViewModel
     val user by viewModel.user.observeAsState()
     val isOwnProfile by viewModel.isOwnProfile.observeAsState(false)
+    val clubs by viewModel.clubs.observeAsState(emptyList())
 
-    // Chama a tela "burra" passando os dados observados
-    ProfileScreenContent(
-        user = user,
-        isOwnProfile = isOwnProfile,
-        onBackClick = onBackClick,
-        onEditProfileClick = onEditProfileClick,
-        onLogoutClick = onLogoutClick,
-        onAddFriendClick = { /* TODO: Lógica de adicionar amigo */ }
-    )
+    if (user == null) {
+        AppBackground(backgroundResId = R.drawable.background) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+    } else {
+        ProfileScreenContent(
+            user = user!!,
+            isOwnProfile = isOwnProfile,
+            clubs = clubs,
+            onBackClick = onBackClick,
+            onEditProfileClick = onEditProfileClick,
+            onLogoutClick = onLogoutClick,
+            onSettingsClick = onSettingsClick,
+            onClubClick = onClubClick // ✅ PARÂMETRO PASSADO
+        )
+    }
 }
 
-
-// --- TELA "BURRA" (STATELESS) ---
-// Apenas exibe a UI, não tem lógica de ViewModel. É esta que o Preview vai usar.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreenContent(
-    user: User?,
+    user: User,
     isOwnProfile: Boolean,
+    clubs: List<BookClub>,
     onBackClick: () -> Unit,
     onEditProfileClick: () -> Unit,
     onLogoutClick: () -> Unit,
-    onAddFriendClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    onClubClick: (BookClub) -> Unit // ✅ PARÂMETRO ADICIONADO
 ) {
     AppBackground(backgroundResId = R.drawable.background) {
-        if (user == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                        }
+                    },
+                    actions = {
+                        if (isOwnProfile) {
+                            IconButton(onClick = onSettingsClick) {
+                                Icon(Icons.Default.Settings, contentDescription = "Configurações")
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
             }
-        } else {
+        ) { paddingValues ->
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                contentPadding = PaddingValues(bottom = 80.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 item {
-                    ProfileTopAppBar(
-                        isOwnProfile = isOwnProfile,
-                        onBackClick = onBackClick,
-                        onEditProfileClick = onEditProfileClick,
-                        onLogoutClick = onLogoutClick,
-                        onAddFriendClick = onAddFriendClick
+                    ProfileHeader(user = user, isOwnProfile = isOwnProfile, onEditProfileClick = onEditProfileClick)
+                }
+                item {
+                    ChecklistSection()
+                }
+                item {
+                    ClubsSection(
+                        title = "Clubes",
+                        clubs = clubs,
+                        onClubClick = onClubClick // ✅ CONEXÃO FEITA AQUI
                     )
                 }
-                item { ProfileHeader(name = user.name, imageUrl = user.profilePictureUrl) }
-                item { FriendsSection(isOwnProfile = isOwnProfile, count = user.friendCount) }
-                item { AboutMeSection(text = user.aboutMe) }
-                item { BookChecklistSection(ratedBooks = user.checklist) }
-                item { ClubsSection(title = "Clubes", clubs = user.clubs, onClubClick = {}) }
-            }
-        }
-    }
-}
-
-
-// --- Componentes Menores (continuam os mesmos) ---
-
-@Composable
-fun ProfileTopAppBar(isOwnProfile: Boolean, onBackClick: () -> Unit, onEditProfileClick: () -> Unit, onLogoutClick: () -> Unit, onAddFriendClick: () -> Unit) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onBackClick) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
-        if (isOwnProfile) {
-            Box {
-                IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Configurações") }
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    DropdownMenuItem(text = { Text("Editar Perfil") }, onClick = { menuExpanded = false; onEditProfileClick() })
-                    DropdownMenuItem(text = { Text("Sair (Logout)") }, onClick = { menuExpanded = false; onLogoutClick() })
-                }
             }
         }
     }
 }
 
 @Composable
-fun ProfileHeader(name: String, imageUrl: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 16.dp)) {
-        AsyncImage(model = imageUrl, contentDescription = "Foto de perfil de $name", modifier = Modifier.size(120.dp).clip(CircleShape), contentScale = ContentScale.Crop)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-fun FriendsSection(isOwnProfile: Boolean, count: Long) { // MUDANÇA: de Int para Long
-    Row(
+fun ProfileHeader(
+    user: User,
+    isOwnProfile: Boolean,
+    onEditProfileClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp)
     ) {
-        Text(
-            text = "$count amigos",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
+        AsyncImage(
+            model = user.profilePictureUrl.ifEmpty { R.drawable.ic_launcher_background },
+            contentDescription = "Foto de Perfil",
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop,
+            placeholder = painterResource(id = R.drawable.ic_launcher_background),
+            error = painterResource(id = R.drawable.ic_launcher_background)
         )
-        if (!isOwnProfile) {
-            Button(onClick = { /* TODO: Lógica de adicionar amigo */ }) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = user.name,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "${user.friendCount} amigos",
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        if (isOwnProfile) {
+            Button(onClick = onEditProfileClick) {
+                Text("Editar Perfil")
+            }
+        } else {
+            Button(onClick = { /* TODO: Adicionar amigo */ }) {
                 Text("Adicionar amigo")
             }
         }
-    }
-}
-
-@Composable
-fun AboutMeSection(text: String) {
-    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
-        Text(text = if (text.isNotBlank()) text else "Nenhuma descrição adicionada.", style = MaterialTheme.typography.bodyMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-    }
-}
-
-@Composable
-fun BookChecklistSection(ratedBooks: List<RatedBook>) {
-    Column(modifier = Modifier.padding(vertical = 16.dp)) {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Checklist", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Button(onClick = { /* TODO: Adicionar livro */ }) { Text("Adicionar livro") }
-        }
         Spacer(modifier = Modifier.height(16.dp))
-        LazyRow(contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            items(ratedBooks) { ratedBook -> RatedBookCard(ratedBook = ratedBook) }
-        }
+        Text(
+            text = user.aboutMe,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
 @Composable
-fun RatedBookCard(ratedBook: RatedBook) {
-    // MUDANÇA: Adicionamos esta verificação para garantir que o livro não é nulo
-    if (ratedBook.book != null) {
-        Column(
-            modifier = Modifier.width(120.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+fun ChecklistSection() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = ratedBook.book.coverUrl,
-                contentDescription = ratedBook.book.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
+            Text(
+                text = "Checklist",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "${ratedBook.rating}/5", style = MaterialTheme.typography.bodySmall)
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = "Nota",
-                    modifier = Modifier.size(16.dp),
-                    tint = Color(0xFFFFC107)
-                )
+            Button(onClick = { /* TODO: Adicionar livro */ }) {
+                Text("Adicionar livro")
             }
         }
+        Spacer(modifier = Modifier.height(16.dp))
+        // Aqui virá a lista de livros...
     }
 }
 
-
-// --- PREVIEWS ATUALIZADOS ---
-// Agora podemos facilmente testar os dois cenários!
-
-@Preview(name = "Meu Perfil", showBackground = true)
+@Preview(showBackground = true)
 @Composable
-fun OwnProfileScreenPreview() {
-    LetrariaAppTheme {
-        // O Preview chama a tela "burra" (Content) passando dados de exemplo
-        ProfileScreenContent(
-            user = sampleUser, // nosso usuário de exemplo
-            isOwnProfile = true, // Dizendo que é nosso próprio perfil
-            onBackClick = {},
-            onEditProfileClick = {},
-            onLogoutClick = {},
-            onAddFriendClick = {}
-        )
-    }
-}
-
-@Preview(name = "Perfil de Visitante", showBackground = true)
-@Composable
-fun VisitorProfileScreenPreview() {
+fun ProfileScreenPreview() {
     LetrariaAppTheme {
         ProfileScreenContent(
             user = sampleUser,
-            isOwnProfile = false, // Dizendo que NÃO é nosso perfil
+            isOwnProfile = true,
+            clubs = sampleClubsList,
             onBackClick = {},
             onEditProfileClick = {},
             onLogoutClick = {},
-            onAddFriendClick = {}
+            onSettingsClick = {},
+            onClubClick = {} // ✅ ADICIONADO AO PREVIEW
         )
     }
 }
