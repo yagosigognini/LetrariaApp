@@ -1,6 +1,7 @@
 package br.com.letrariaapp.data
 
 import br.com.letrariaapp.R
+import com.google.firebase.Timestamp // ⬇️ NOVO: Importar Timestamp
 
 // --- DADOS DE EXEMPLO PARA O USUÁRIO ---
 val sampleUser = User(
@@ -43,3 +44,32 @@ val sampleClubsList = listOf(
         maxMembers = 10
     )
 )
+
+// ⬇️ --- NOVO: DADOS DE EXEMPLO PARA OS LIVROS AVALIADOS --- ⬇️
+val sampleRatedBooks = listOf(
+    ProfileRatedBook(
+        googleBookId="1",
+        title="Livro de Exemplo 1",
+        authors=listOf("Autor A"),
+        coverUrl = null, // Deixe null para testar o placeholder no preview
+        rating = 4.0f,
+        ratedAt = Timestamp.now() // Use Timestamp.now() para o preview
+    ),
+    ProfileRatedBook(
+        googleBookId="2",
+        title="Outro Livro Com Título Bem Longo Para Testar",
+        authors=listOf("Autor B", "Coautor"),
+        coverUrl = null,
+        rating = 3.5f,
+        ratedAt = Timestamp.now()
+    ),
+    ProfileRatedBook(
+        googleBookId="3",
+        title="Livro 3",
+        authors=listOf("Autor C"),
+        coverUrl = null,
+        rating = 5.0f,
+        ratedAt = Timestamp.now()
+    )
+)
+// ⬆️ --- FIM DOS DADOS DE EXEMPLO --- ⬆️

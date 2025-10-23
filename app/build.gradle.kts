@@ -1,9 +1,23 @@
+import java.util.Properties // ✅ Adicionado import
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.gms.google.services)
+    id("kotlin-parcelize")
 }
+
+// ✅ Função para ler o local.properties
+fun getLocalProperty(key: String, project: org.gradle.api.Project): String {
+    val properties = Properties()
+    val localPropertiesFile = project.rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        properties.load(localPropertiesFile.inputStream())
+    }
+    return properties.getProperty(key) ?: ""
+}
+
 
 android {
     namespace = "br.com.letrariaapp"
@@ -17,6 +31,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // ✅ Adiciona a chave da API ao BuildConfig
+        //    Certifique-se que 'getLocalProperty("GOOGLE_BOOKS_API_KEY", project)' está correto
+        buildConfigField("String", "GOOGLE_BOOKS_API_KEY", "\"${getLocalProperty("GOOGLE_BOOKS_API_KEY", project)}\"")
     }
 
     buildTypes {
@@ -26,6 +44,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // ✅ Adiciona a chave da API ao BuildConfig de Release também
+            buildConfigField("String", "GOOGLE_BOOKS_API_KEY", "\"${getLocalProperty("GOOGLE_BOOKS_API_KEY", project)}\"")
+        }
+        // ✅ Opcional, mas recomendado: Adicione ao Debug também se precisar testar
+        debug {
+            buildConfigField("String", "GOOGLE_BOOKS_API_KEY", "\"${getLocalProperty("GOOGLE_BOOKS_API_KEY", project)}\"")
         }
     }
     compileOptions {
@@ -37,7 +61,7 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = true
+        buildConfig = true // Mantém isso
     }
 }
 
@@ -63,13 +87,10 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
-
     implementation("com.google.firebase:firebase-config-ktx")
-
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 
     // --- Coroutines ---
-    // Permite usar .await() em tarefas do Firebase/Google Play Services
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.0")
 
     // --- ViewModel & Navegação ---
@@ -79,6 +100,12 @@ dependencies {
 
     // --- Carregamento de Imagens ---
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // --- NETWORK & JSON PARSING (RETROFIT + GSON) ---
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
 
     // --- Testes ---
     testImplementation(libs.junit)

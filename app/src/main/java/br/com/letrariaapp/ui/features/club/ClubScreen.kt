@@ -1,5 +1,7 @@
 package br.com.letrariaapp.ui.features.club
 
+// --- Imports Essenciais ---
+import android.util.Log // ⚠️ IMPORT ADICIONADO
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,14 +13,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search // Import do ícone de busca
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,22 +28,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext // ✅ IMPORT ADICIONADO
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction // ✅ IMPORT ADICIONADO
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.letrariaapp.R
 import br.com.letrariaapp.data.BookClub
-import br.com.letrariaapp.data.IndicatedBook
+import br.com.letrariaapp.data.IndicatedBook // Import do modelo de livro indicado
 import br.com.letrariaapp.data.Message
 import br.com.letrariaapp.data.User
-import br.com.letrariaapp.data.sampleClubsList
-import br.com.letrariaapp.data.sampleUser
+import br.com.letrariaapp.data.sampleClubsList // Para Preview
+import br.com.letrariaapp.data.sampleUser // Para Preview
 import br.com.letrariaapp.ui.components.AppBackground
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import coil.compose.AsyncImage
@@ -53,29 +51,46 @@ import com.google.firebase.ktx.Firebase
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
+import java.util.Locale // Para formatar data/hora
 
 // --- TELA "INTELIGENTE" (STATEFUL) ---
 @Composable
 fun ClubScreen(
     clubId: String,
-    viewModel: ClubViewModel,
+    viewModel: ClubViewModel, // Recebe o ViewModel injetado pela Navegação
     onBackClick: () -> Unit,
     onProfileClick: (String) -> Unit,
-    onAdminClick: () -> Unit
+    onAdminClick: () -> Unit,
+    onSearchBookClick: () -> Unit // Recebe o lambda da Navegação para buscar livro
 ) {
+    // Inicia o carregamento quando o clubId muda (ou na primeira vez)
     LaunchedEffect(clubId) {
         viewModel.loadClubAndMessages(clubId)
     }
 
+    // Observa os estados do ViewModel
     val club by viewModel.club.observeAsState()
     val messages by viewModel.messages.observeAsState(emptyList())
     val isLoading by viewModel.isLoading.observeAsState(true)
     val accessDenied by viewModel.accessDenied.observeAsState(false)
     val sortedUser by viewModel.sortedUser.observeAsState(null)
-    var inputText by remember { mutableStateOf("") }
+    val bookPendingIndication by viewModel.bookPendingIndication // Observa o livro pendente vindo da busca
 
-    val context = LocalContext.current // ✅ CONTEXTO PARA O TOAST DO NOVO BOTÃO
+    var inputText by remember { mutableStateOf("") } // Estado local para o campo de mensagem
+    val context = LocalContext.current
 
+    // Mostra o diálogo de confirmação se houver um livro pendente (retornado da busca)
+    bookPendingIndication?.let { book ->
+        IndicationConfirmationDialog(
+            bookTitle = book.volumeInfo?.title, // Passa o título
+            // Usa os dias configurados no clube ou 15 como padrão inicial
+            initialCycleDays = club?.readingCycleDays?.toString() ?: "15",
+            onDismiss = { viewModel.cancelBookIndication() }, // Ação de cancelar
+            onConfirm = { daysString -> viewModel.confirmBookIndication(daysString) } // Ação de confirmar
+        )
+    }
+
+    // Passa os estados e callbacks para a tela "burra" (Content)
     ClubScreenContent(
         club = club,
         messages = messages,
@@ -85,22 +100,19 @@ fun ClubScreen(
         onSendMessage = {
             if (inputText.isNotBlank()) {
                 viewModel.sendMessage(inputText, clubId)
-                inputText = ""
+                inputText = "" // Limpa o campo após enviar
             }
         },
-        onSortearClick = { viewModel.drawUserForCycle() },
-        onIndicarLivroClick = { title, author, publisher, cycleDays ->
-            viewModel.indicateBook(clubId, title, author, publisher, cycleDays)
-        },
+        onSortearClick = { viewModel.drawUserForCycle() }, // Callback para sortear
+        onSearchBookClick = onSearchBookClick, // Passa o callback de busca
         isLoading = isLoading,
         accessDenied = accessDenied,
         onBackClick = onBackClick,
         onProfileClick = onProfileClick,
         onAdminClick = onAdminClick,
-        // ✅ AÇÃO PARA O NOVO BOTÃO DE MENU
         onMenuClick = {
-            // TODO: Substituir isso por um BottomSheet com as opções
-            Toast.makeText(context, "Menu de opções (Gamificação, etc)", Toast.LENGTH_SHORT).show()
+            // Ação temporária para o botão de menu
+            Toast.makeText(context, "Menu de opções", Toast.LENGTH_SHORT).show()
         }
     )
 }
@@ -116,23 +128,24 @@ fun ClubScreenContent(
     onInputChange: (String) -> Unit,
     onSendMessage: () -> Unit,
     onSortearClick: () -> Unit,
-    onIndicarLivroClick: (String, String, String, Int) -> Unit,
+    onSearchBookClick: () -> Unit, // Recebe o lambda de busca
     isLoading: Boolean,
     accessDenied: Boolean,
     onBackClick: () -> Unit,
     onProfileClick: (String) -> Unit,
     onAdminClick: () -> Unit,
-    onMenuClick: () -> Unit // ✅ PARÂMETRO ADICIONADO
+    onMenuClick: () -> Unit
 ) {
     AppBackground(backgroundResId = R.drawable.background) {
         Scaffold(
             bottomBar = {
+                // Mostra o campo de input apenas se o usuário for membro
                 if (!accessDenied) {
                     MessageInput(
-                        text = inputText,
-                        onTextChange = onInputChange,
-                        onSendClick = onSendMessage,
-                        onMenuClick = onMenuClick // ✅ PASSANDO A AÇÃO PARA O INPUT
+                        text = inputText, // Passa o texto atual
+                        onTextChange = onInputChange, // Passa a função para mudar o texto
+                        onSendClick = onSendMessage, // Passa a função de enviar
+                        onMenuClick = onMenuClick // Passa a função do menu
                     )
                 }
             },
@@ -141,55 +154,62 @@ fun ClubScreenContent(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = paddingValues.calculateBottomPadding())
+                    .padding(bottom = paddingValues.calculateBottomPadding()) // Ajusta padding inferior
             ) {
+                // Cabeçalho com imagem e nome do clube
                 ClubHeader(
-                    club = club,
-                    onBackClick = onBackClick,
-                    onAdminClick = onAdminClick
+                    club = club, // Passa os dados do clube
+                    onBackClick = onBackClick, // Passa a função de voltar
+                    onAdminClick = onAdminClick // Passa a função de admin
                 )
 
+                // Painel de Ações (Sorteio/Indicação) - Mostrado apenas se for membro
                 if (club != null && !accessDenied) {
                     ActionPanel(
-                        club = club,
-                        sortedUser = sortedUser,
-                        onSortearClick = onSortearClick,
-                        onIndicarLivroClick = onIndicarLivroClick
+                        club = club, // Passa os dados do clube
+                        sortedUser = sortedUser, // Passa o usuário sorteado
+                        onSortearClick = onSortearClick, // Passa a função de sortear
+                        onSearchBookClick = onSearchBookClick // Passa a função de busca
                     )
                 }
 
-                if (isLoading) {
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                // Corpo principal: Loading, Acesso Negado ou Lista de Mensagens
+                when {
+                    isLoading -> { // Mostra indicador de carregamento
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
                     }
-                } else if (accessDenied) {
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        Text(
-                            "Você não é membro deste clube.",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(16.dp)
+                    accessDenied -> { // Mostra mensagem de acesso negado
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            Text(
+                                "Você não é membro deste clube.",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
+                    else -> { // Mostra a lista de mensagens
+                        MessageList(
+                            messages = messages, // Passa a lista de mensagens
+                            onProfileClick = onProfileClick, // Passa a função de clique no perfil
+                            modifier = Modifier.weight(1f) // Ocupa o espaço restante
                         )
                     }
-                } else {
-                    MessageList(
-                        messages = messages,
-                        onProfileClick = onProfileClick,
-                        modifier = Modifier.weight(1f)
-                    )
                 }
             }
         }
     }
 }
 
-// ... (ActionPanel, ClubHeader, MessageList, MessageItem - NENHUMA MUDANÇA AQUI) ...
+// --- COMPONENTES DA TELA ---
 
 @Composable
 fun ActionPanel(
     club: BookClub,
     sortedUser: User?,
     onSortearClick: () -> Unit,
-    onIndicarLivroClick: (String, String, String, Int) -> Unit
+    onSearchBookClick: () -> Unit // Recebe o lambda de busca
 ) {
     val currentUserId = Firebase.auth.currentUser?.uid
     val isAdmin = currentUserId == club.adminId
@@ -198,13 +218,10 @@ fun ActionPanel(
     val sortedUserId = club.currentUserForCycleId
     val indicatedBook = club.indicatedBook
 
-    var title by remember { mutableStateOf("") }
-    var author by remember { mutableStateOf("") }
-    var publisher by remember { mutableStateOf("") }
-    var cycleDays by remember { mutableStateOf(club.readingCycleDays.toString()) }
-
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp), // Ajuste de padding
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 2.dp
@@ -214,66 +231,57 @@ fun ActionPanel(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // Estado 1: Ninguém foi sorteado
+            // Estado 1: Ninguém sorteado
             if (sortedUserId == null) {
                 if (isAdmin) {
                     Text("Ninguém foi sorteado para indicar o próximo livro.")
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = onSortearClick) {
-                        Text("Sortear usuário")
-                    }
+                    Button(onClick = onSortearClick) { Text("Sortear usuário") }
                 } else {
                     Text("Aguardando o admin sortear o próximo usuário.")
                 }
             }
-
-            // Estado 2: Sorteado, mas sem livro
+            // Estado 2: Sorteado, mas sem livro indicado
             else if (indicatedBook == null) {
-                if (isSortedUser) {
-                    Text("Você foi sorteado! Indique o próximo livro:", textAlign = TextAlign.Center)
+                if (isSortedUser) { // Se for a vez do usuário atual
+                    Text("Sua vez de indicar o próximo livro!", textAlign = TextAlign.Center)
                     Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Título do Livro") }, modifier = Modifier.fillMaxWidth())
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = author, onValueChange = { author = it }, label = { Text("Autor") }, modifier = Modifier.fillMaxWidth())
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = publisher, onValueChange = { publisher = it }, label = { Text("Editora") }, modifier = Modifier.fillMaxWidth())
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = cycleDays,
-                        onValueChange = { cycleDays = it.filter { char -> char.isDigit() } },
-                        label = { Text("Tempo de leitura (dias)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = {
-                        onIndicarLivroClick(title, author, publisher, cycleDays.toIntOrNull() ?: 15)
-                    }) {
-                        Text("Indicar Livro")
+                    // Botão para navegar para a tela de busca
+                    Button(onClick = onSearchBookClick) {
+                        Icon(Icons.Default.Search, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                        Text("Buscar e Indicar Livro")
                     }
-                } else {
-                    val sortedUserName = sortedUser?.name ?: "..."
-                    Text("Esperando @${sortedUserName} indicar um livro.", textAlign = TextAlign.Center)
+                } else { // Se for a vez de outro usuário
+                    val sortedUserName = sortedUser?.name ?: "o usuário sorteado"
+                    Text("Aguardando ${sortedUserName} indicar um livro.", textAlign = TextAlign.Center)
                 }
             }
-
-            // Estado 3: Livro indicado
+            // Estado 3: Livro já indicado
             else {
                 val now = System.currentTimeMillis()
-                val endDate = club.cycleEndDate ?: now
+                val endDate = club.cycleEndDate ?: now // Usa data atual se endDate for nulo
+                // Calcula dias restantes (garante que não seja negativo)
                 val daysRemaining = if (endDate < now) 0 else TimeUnit.MILLISECONDS.toDays(endDate - now)
 
+                // Texto informativo sobre o ciclo
                 val textToShow = when {
-                    daysRemaining > 1 -> "Faltam $daysRemaining dias para o ciclo acabar"
-                    daysRemaining == 1L -> "Falta 1 dia para o ciclo acabar"
-                    else -> "Ciclo encerrado!"
+                    daysRemaining > 1 -> "Faltam $daysRemaining dias para o fim do ciclo"
+                    daysRemaining == 1L -> "Último dia do ciclo!"
+                    else -> "Ciclo de leitura encerrado!"
                 }
 
                 Text(textToShow, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Livro: ${indicatedBook.title} por ${indicatedBook.author}", style = MaterialTheme.typography.bodyMedium)
+                // Mostra detalhes do livro indicado
+                Text(
+                    "Livro: ${indicatedBook.title ?: "N/D"} por ${indicatedBook.author ?: "N/D"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Botão para sortear novamente (apenas para admin e se o ciclo acabou)
                 if (isAdmin && daysRemaining < 1) {
                     Button(onClick = onSortearClick) {
                         Text("Sortear novo usuário")
@@ -283,6 +291,7 @@ fun ActionPanel(
         }
     }
 }
+
 
 @Composable
 fun ClubHeader(
@@ -300,34 +309,41 @@ fun ClubHeader(
             contentDescription = "Capa do Clube",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            placeholder = painterResource(id = R.drawable.ic_launcher_background),
+            placeholder = painterResource(id = R.drawable.ic_launcher_background), // Usar placeholder melhor depois
             error = painterResource(id = R.drawable.ic_launcher_background)
         )
-        Box(
+        Box( // Gradiente para escurecer a parte inferior
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
-                        startY = 50f
+                        startY = 50f // Onde o gradiente começa
                     )
                 )
-                .windowInsetsPadding(WindowInsets.statusBars)
+                .windowInsetsPadding(WindowInsets.statusBars) // Empurra o conteúdo abaixo da status bar
         )
+        // Botão Voltar
         IconButton(
             onClick = onBackClick,
-            modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(8.dp)
         ) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Color.White)
         }
 
+        // Botão Admin (Configurações) - TODO: Verificar se é admin antes de mostrar?
         IconButton(
             onClick = onAdminClick,
-            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
         ) {
             Icon(Icons.Default.Settings, contentDescription = "Configurações do Clube", tint = Color.White)
         }
 
+        // Nome do Clube
         Text(
             text = club?.name ?: "Carregando...",
             style = MaterialTheme.typography.headlineSmall,
@@ -344,55 +360,64 @@ fun ClubHeader(
 fun MessageList(
     messages: List<Message>,
     onProfileClick: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier // Recebe o modifier
 ) {
     val listState = rememberLazyListState()
 
+    // Rola para a última mensagem quando a lista muda
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
+            // Use coroutine para garantir que a rolagem aconteça após a composição
             listState.animateScrollToItem(messages.size - 1)
         }
     }
 
     LazyColumn(
         state = listState,
-        modifier = modifier,
+        modifier = modifier, // Aplica o modifier recebido (geralmente .weight(1f))
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp) // Espaço entre mensagens
     ) {
-        items(messages) { message ->
-            MessageItem(message = message, onProfileClick = onProfileClick)
+        items(messages) { message -> // Itera sobre a lista de mensagens
+            MessageItem(message = message, onProfileClick = onProfileClick) // Passa cada mensagem
         }
     }
 }
 
 @Composable
 fun MessageItem(
-    message: Message,
-    onProfileClick: (String) -> Unit
+    message: Message, // Recebe a mensagem a ser exibida
+    onProfileClick: (String) -> Unit // Recebe a ação de clique no perfil
 ) {
     val currentUserId = Firebase.auth.currentUser?.uid
     val isCurrentUser = message.senderId == currentUserId
 
     Row(
         modifier = Modifier.fillMaxWidth(),
+        // Alinha a mensagem à direita se for do usuário atual, senão à esquerda
         horizontalArrangement = if (isCurrentUser) Arrangement.End else Arrangement.Start
     ) {
-        Row(verticalAlignment = Alignment.Top) {
+        Row(verticalAlignment = Alignment.Top) { // Alinha foto e coluna de texto
+            // Mostra a foto apenas se NÃO for o usuário atual
             if (!isCurrentUser) {
                 AsyncImage(
-                    model = message.senderPhotoUrl.ifEmpty { R.drawable.ic_launcher_background },
+                    model = message.senderPhotoUrl.ifEmpty { R.drawable.ic_launcher_background }, // Placeholder
                     contentDescription = "Foto de ${message.senderName}",
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .clickable { onProfileClick(message.senderId) },
-                    contentScale = ContentScale.Crop
+                        .clickable { onProfileClick(message.senderId) }, // Permite clicar na foto
+                    contentScale = ContentScale.Crop,
+                    // Adiciona placeholders/errors melhores se necessário
+                    placeholder = painterResource(id = R.drawable.ic_launcher_background),
+                    error = painterResource(id = R.drawable.ic_launcher_background)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
             }
 
+            // Coluna com nome (se não for user atual), balão da mensagem e hora
             Column(horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start) {
+                // Mostra o nome do remetente apenas se NÃO for o usuário atual
                 if (!isCurrentUser) {
                     Text(
                         text = message.senderName,
@@ -400,21 +425,26 @@ fun MessageItem(
                         fontWeight = FontWeight.Bold
                     )
                 }
+                // Balão da mensagem
                 Surface(
-                    shape = RoundedCornerShape(
+                    shape = RoundedCornerShape( // Cantos arredondados específicos
                         topStart = 8.dp, topEnd = 8.dp,
-                        bottomStart = if (isCurrentUser) 8.dp else 0.dp,
-                        bottomEnd = if (isCurrentUser) 0.dp else 8.dp
+                        bottomStart = if (isCurrentUser) 8.dp else 0.dp, // Canto inferior esquerdo reto se não for user atual
+                        bottomEnd = if (isCurrentUser) 0.dp else 8.dp // Canto inferior direito reto se for user atual
                     ),
-                    color = if (isCurrentUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                    // Cores diferentes para diferenciar
+                    color = if (isCurrentUser) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant
                 ) {
+                    // Texto da mensagem dentro do balão
                     Text(
                         text = message.text,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                     )
                 }
+                // Hora da mensagem
                 Text(
-                    text = message.timestamp.toFormattedString(),
+                    text = message.timestamp.toFormattedString(), // Usa a função de formatação
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -423,67 +453,58 @@ fun MessageItem(
     }
 }
 
-// ✅ --- FUNÇÃO MESSAGEINPUT TOTALMENTE ATUALIZADA ---
+
 @Composable
 fun MessageInput(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onSendClick: () -> Unit,
-    onMenuClick: () -> Unit // ✅ Parâmetro para o novo botão de menu
+    text: String, // Texto atual no campo
+    onTextChange: (String) -> Unit, // Função para atualizar o texto
+    onSendClick: () -> Unit, // Função para enviar a mensagem
+    onMenuClick: () -> Unit // Função para o botão de menu
 ) {
-    Surface(shadowElevation = 8.dp) {
+    Surface(shadowElevation = 8.dp) { // Sombra para destacar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
+                .windowInsetsPadding(WindowInsets.navigationBars) // Afasta do fundo (gestos/botões)
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ✅ Botão de Menu (Três barrinhas)
-            // Usei o FilledTonalIconButton para dar o fundo circular que você mostrou
+            // Botão de Menu
             FilledTonalIconButton(onClick = onMenuClick) {
-                Icon(
-                    Icons.Default.Menu,
-                    contentDescription = "Opções"
-                )
+                Icon(Icons.Default.Menu, contentDescription = "Opções")
             }
             Spacer(modifier = Modifier.width(8.dp))
 
-            // ✅ Campo de Texto
+            // Campo de Texto
             OutlinedTextField(
-                value = text,
-                onValueChange = onTextChange,
-                modifier = Modifier.weight(1f), // Ocupa o espaço restante
+                value = text, // Mostra o texto atual
+                onValueChange = onTextChange, // Atualiza o texto quando digitado
+                modifier = Modifier.weight(1f), // Ocupa espaço
                 placeholder = { Text("Digite uma mensagem") },
-                shape = RoundedCornerShape(24.dp),
-                singleLine = true,
-                // Ações do teclado (para enviar com "Enter")
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(
-                    onSend = { onSendClick() }
-                ),
-                // ✅ Botão de Enviar (Avião) DENTRO do campo de texto
-                trailingIcon = {
-                    IconButton(onClick = onSendClick) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Enviar"
-                        )
+                shape = RoundedCornerShape(24.dp), // Bordas arredondadas
+                singleLine = true, // Evita quebra de linha
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), // Botão "Enviar" no teclado
+                keyboardActions = KeyboardActions(onSend = { onSendClick() }), // Ação ao clicar no botão do teclado
+                trailingIcon = { // Ícone dentro do campo
+                    IconButton(onClick = onSendClick) { // Botão de enviar
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enviar")
                     }
                 }
             )
-            // ❌ O Spacer e o IconButton(Send) que estavam aqui foram removidos
         }
     }
 }
 
+// Função utilitária para formatar a data/hora da mensagem
 private fun Date?.toFormattedString(): String {
     if (this == null) return ""
     return try {
+        // Formato simples HH:mm
         val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
         sdf.format(this)
     } catch (e: Exception) {
-        ""
+        Log.e("ClubScreenFormatting", "Erro ao formatar data: $this", e)
+        "" // Retorna vazio em caso de erro
     }
 }
 
@@ -491,6 +512,7 @@ private fun Date?.toFormattedString(): String {
 @Preview(showBackground = true)
 @Composable
 fun ClubScreenContentPreview() {
+    // Dados de exemplo para o preview
     val sampleMessages = listOf(
         Message(senderName = "Yago", text = "Olá pessoal! Vamos começar a ler?", timestamp = Date()),
         Message(senderName = "Fulano", text = "Claro! Já estou na página 50.", timestamp = Date())
@@ -510,13 +532,13 @@ fun ClubScreenContentPreview() {
             onInputChange = {},
             onSendMessage = {},
             onSortearClick = {},
-            onIndicarLivroClick = { _, _, _, _ -> },
+            onSearchBookClick = {}, // Adicionado para o preview compilar
             isLoading = false,
             accessDenied = false,
             onBackClick = {},
             onProfileClick = {},
             onAdminClick = {},
-            onMenuClick = {} // ✅ ADICIONADO AO PREVIEW
+            onMenuClick = {}
         )
     }
 }

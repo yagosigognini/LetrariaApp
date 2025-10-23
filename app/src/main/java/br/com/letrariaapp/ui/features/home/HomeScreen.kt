@@ -1,15 +1,11 @@
 package br.com.letrariaapp.ui.features.home
 
-// ... (Imports normais - REMOVA o import para BackgroundType se existir)
-// import br.com.letrariaapp.ui.components.BackgroundType // ❌ REMOVA ESTE IMPORT
-
-import androidx.compose.foundation.Image
+// ... Imports normais
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -217,6 +213,8 @@ fun HomeScreenContent(
 
             item { Spacer(modifier = Modifier.height(24.dp)) }
             item { ActionButtons(onCreateClubClick, onJoinClubClick) }
+
+
         }
     }
 }
@@ -342,9 +340,10 @@ fun HomeScreenPreview() {
             onProfileClick = {},
             onSettingsClick = {},
             onCreateClubClick = {},
-            onJoinClubClick = {},
-            onClubClick = {}
-        )
+            onJoinClubClick = {}
+        ) {}
+        // ⚠️ TESTE TEMPORÁRIO
+
     }
 }
 

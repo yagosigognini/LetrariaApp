@@ -4,7 +4,9 @@ import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState // ✅ IMPORT ADICIONADO
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll // ✅ IMPORT ADICIONADO
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -64,28 +66,30 @@ fun RegisterScreen(
         TermsDialog(onDismiss = { showTermsDialog = false })
     }
 
-    RegisterScreenContent(
-        nome = nome,
-        onNomeChange = { nome = it },
-        email = email,
-        onEmailChange = { email = it },
-        password = password,
-        onPasswordChange = { password = it },
-        confirmPassword = confirmPassword,
-        onConfirmPasswordChange = { confirmPassword = it },
-        isChecked = isChecked,
-        onCheckedChange = { isChecked = it },
-        onRegisterClick = {
-            if (password != confirmPassword) {
-                Toast.makeText(context, "As senhas não coincidem.", Toast.LENGTH_SHORT).show()
-            } else {
-                viewModel.register(nome, email, password)
-            }
-        },
-        onLoginClick = onLoginClick,
-        onTermsClick = { showTermsDialog = true },
-        isLoading = authResult is AuthResult.LOADING
-    )
+    AppBackground(backgroundResId = R.drawable.app_background) {
+        RegisterScreenContent(
+            nome = nome,
+            onNomeChange = { nome = it },
+            email = email,
+            onEmailChange = { email = it },
+            password = password,
+            onPasswordChange = { password = it },
+            confirmPassword = confirmPassword,
+            onConfirmPasswordChange = { confirmPassword = it },
+            isChecked = isChecked,
+            onCheckedChange = { isChecked = it },
+            onRegisterClick = {
+                if (password != confirmPassword) {
+                    Toast.makeText(context, "As senhas não coincidem.", Toast.LENGTH_SHORT).show()
+                } else {
+                    viewModel.register(nome, email, password)
+                }
+            },
+            onLoginClick = onLoginClick,
+            onTermsClick = { showTermsDialog = true },
+            isLoading = authResult is AuthResult.LOADING
+        )
+    }
 }
 
 @Composable
@@ -103,91 +107,125 @@ fun RegisterScreenContent(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
 
-    AppBackground(backgroundResId = R.drawable.app_background) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo_letraria),
+                contentDescription = "Logo Letraria",
+                modifier = Modifier.size(180.dp)
+            )
+            Spacer(modifier = Modifier.weight(1f))
             Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo_letraria),
-                    contentDescription = "Logo Letraria",
-                    modifier = Modifier.size(180.dp)
+                OutlinedTextField(value = nome, onValueChange = onNomeChange, label = { Text("Nome") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true, enabled = !isLoading)
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(value = email, onValueChange = onEmailChange, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true, enabled = !isLoading)
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = password, onValueChange = onPasswordChange, label = { Text("Senha") },
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true,
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(image, null) }
+                    },
+                    enabled = !isLoading
                 )
-                Spacer(modifier = Modifier.weight(1f))
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = confirmPassword, onValueChange = onConfirmPasswordChange, label = { Text("Repetir a Senha") },
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true,
+                    visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        val image = if (confirmPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                        IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) { Icon(image, null) }
+                    },
+                    enabled = !isLoading
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Checkbox(checked = isChecked, onCheckedChange = onCheckedChange, enabled = !isLoading)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Li e concordo com as políticas e termos",
+                        color = TextColor,
+                        modifier = Modifier.clickable(onClick = onTermsClick)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onRegisterClick,
+                    enabled = isChecked && !isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ButtonRed)
                 ) {
-                    OutlinedTextField(value = nome, onValueChange = onNomeChange, label = { Text("Nome") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true, enabled = !isLoading)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(value = email, onValueChange = onEmailChange, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true, enabled = !isLoading)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = password, onValueChange = onPasswordChange, label = { Text("Senha") },
-                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true,
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) { Icon(image, null) }
-                        },
-                        enabled = !isLoading
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = confirmPassword, onValueChange = onConfirmPasswordChange, label = { Text("Repetir a Senha") },
-                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true,
-                        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            val image = if (confirmPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) { Icon(image, null) }
-                        },
-                        enabled = !isLoading
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Checkbox(checked = isChecked, onCheckedChange = onCheckedChange, enabled = !isLoading)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Li e concordo com as políticas e termos",
-                            color = TextColor,
-                            modifier = Modifier.clickable(onClick = onTermsClick)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = onRegisterClick,
-                        enabled = isChecked && !isLoading,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ButtonRed)
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                        } else {
-                            Text("CADASTRAR", color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    TextButton(onClick = onLoginClick, enabled = !isLoading) {
-                        Text("Já tem uma conta? Faça login", color = TextColor)
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                    } else {
+                        Text("CADASTRAR", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+                TextButton(onClick = onLoginClick, enabled = !isLoading) {
+                    Text("Já tem uma conta? Faça login", color = TextColor)
+                }
             }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
+// ✅ --- DIÁLOGO DE TERMOS CORRIGIDO ---
 @Composable
 fun TermsDialog(onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = RoundedCornerShape(16.dp)) {
-            Column(modifier = Modifier.padding(24.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .heightIn(max = 500.dp) // Limita a altura máxima
+            ) {
+                // 1. Título (Fixo)
                 Text("Políticas e Termos", style = MaterialTheme.typography.headlineSmall)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Aqui vai o texto completo dos seus termos de serviço e políticas de privacidade...")
+
+                // 2. Área do Texto (Rolável)
+                Box(
+                    modifier = Modifier
+                        .weight(1f) // Ocupa o espaço disponível
+                        .verticalScroll(rememberScrollState()) // Adiciona a rolagem
+                ) {
+                    Text(
+                        "Bem-vindo ao Letraria! Ao usar nosso aplicativo, você concorda com estes termos. \n\n" +
+                                "1. Contas de Usuário: Você é responsável por manter a confidencialidade da sua conta e senha. Você concorda em aceitar a responsabilidade por todas as atividades que ocorram sob sua conta.\n\n" +
+                                "2. Conteúdo Gerado pelo Usuário: Você é o único responsável pelo conteúdo (mensagens, indicações de livros, etc.) que publica nos clubes de leitura. Você não deve postar conteúdo ilegal, odioso ou difamatório.\n\n" +
+                                "3. Administração do Clube: Os administradores do clube têm o poder de adicionar ou remover membros de seus respectivos clubes. O Letraria não se responsabiliza por disputas de gerenciamento de clube.\n\n" +
+                                "4. Rescisão: Podemos rescindir ou suspender seu acesso ao nosso serviço imediatamente, sem aviso prévio ou responsabilidade, por qualquer motivo, incluindo violação destes Termos.\n\n" +
+                                "Estes termos são um modelo para um projeto acadêmico." +
+                                "Esta política descreve como coletamos e usamos seus dados.\n\n" +
+                                "1. Coleta de Dados: Coletamos as informações que você fornece durante o cadastro (nome, e-mail). Se você usar o Login do Google, coletamos o ID, nome e foto do perfil fornecidos pelo Google.\n\n" +
+                                "2. Uso de Dados: Usamos seus dados para identificar você no aplicativo, exibir seu perfil para outros membros do clube e permitir a funcionalidade principal do aplicativo. Não vendemos seus dados a terceiros.\n\n" +
+                                "3. Exclusão de Conta: Você pode excluir sua conta a qualquer momento através da tela de 'Configurações'. Ao fazer isso, todos os seus dados pessoais e conteúdo gerado (mensagens, etc.) serão permanentemente removidos de nossos servidores.\n\n" +
+                                "Esta política é um modelo para um projeto acadêmico.",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
+
+                // 3. Botão (Fixo)
                 Button(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
                     Text("FECHAR")
                 }

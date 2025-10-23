@@ -1,7 +1,5 @@
 package br.com.letrariaapp
 
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -18,7 +16,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import br.com.letrariaapp.data.BookClub
+import android.util.Log
+// ⚠️ REMOVIDO: import br.com.letrariaapp.data.Book
+import br.com.letrariaapp.data.BookItem // ⬇️ NOVO: Importar o BookItem (de GoogleBooksModels.kt)
 import br.com.letrariaapp.ui.features.home.HomeScreen
 import br.com.letrariaapp.ui.features.auth.AuthViewModel
 import br.com.letrariaapp.ui.features.auth.LoginScreen
@@ -44,10 +44,12 @@ import br.com.letrariaapp.ui.features.search.SearchClubScreen
 import br.com.letrariaapp.ui.features.search.SearchClubViewModel
 import br.com.letrariaapp.ui.features.settings.SettingsScreen
 import br.com.letrariaapp.ui.features.settings.SettingsViewModel
+import br.com.letrariaapp.ui.features.booksearch.BookSearchScreen
 import br.com.letrariaapp.ui.features.settings.TermsAndPoliciesScreen
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,6 +63,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// Chave pública para o resultado da busca
+const val BOOK_SEARCH_RESULT_KEY = "selected_book"
+
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
@@ -71,6 +76,7 @@ fun AppNavigation() {
 
     NavHost(navController = navController, startDestination = startDestination) {
 
+        // ... (login, register, home - sem mudanças) ...
         composable("login") {
             LoginScreen(
                 viewModel = authViewModel,
@@ -94,10 +100,7 @@ fun AppNavigation() {
         }
 
         composable("home") {
-            // Note: HomeViewModel não está sendo instanciado/passado aqui ainda.
-            // Se HomeScreen precisar dele, você precisará adicioná-lo.
             HomeScreen(
-                //viewModel = homeViewModel,
                 onProfileClick = {
                     val userId = Firebase.auth.currentUser?.uid
                     if (userId != null) {
@@ -113,14 +116,31 @@ fun AppNavigation() {
             )
         }
 
+
         composable(
             route = "profile/{userId}",
             arguments = listOf(navArgument("userId") { type = NavType.StringType; nullable = true })
         ) { backStackEntry ->
             val profileViewModel: ProfileViewModel = viewModel()
+
+            // --- CÓDIGO PARA RECEBER LIVRO (PROFILE) ---
+            val bookResult = backStackEntry.savedStateHandle
+                .getLiveData<BookItem>(BOOK_SEARCH_RESULT_KEY)
+                .observeAsState()
+
+            LaunchedEffect(bookResult.value) {
+                bookResult.value?.let { bookItem ->
+                    Log.d("ProfileNav", "Recebido o livro: ${bookItem.volumeInfo?.title}")
+                    profileViewModel.onBookSelectedForRating(bookItem) // Chama ViewModel do Profile
+                    backStackEntry.savedStateHandle.remove<BookItem>(BOOK_SEARCH_RESULT_KEY)
+                }
+            }
+            // --- FIM CÓDIGO RECEBIMENTO (PROFILE) ---
+
             ProfileScreen(
                 viewModel = profileViewModel,
                 userId = backStackEntry.arguments?.getString("userId"),
+                // 👇 PARÂMETROS QUE FALTAVAM REINSERIDOS 👇
                 onBackClick = { navController.popBackStack() },
                 onEditProfileClick = { navController.navigate("edit_profile") },
                 onLogoutClick = {
@@ -128,14 +148,19 @@ fun AppNavigation() {
                     navController.navigate("login") { popUpTo(0) }
                 },
                 onSettingsClick = { navController.navigate("settings") },
+                // 👆 FIM DOS PARÂMETROS REINSERIDOS 👆
                 onClubClick = { club ->
                     navController.navigate("club/${club.id}")
+                },
+                onAddBookClick = { // Navega para busca a partir do Profile
+                    navController.navigate("book_search")
                 }
             )
         }
 
+        // ... (edit_profile, settings, create_club, search_club - sem mudanças) ...
         composable("edit_profile") {
-            val profileViewModel: ProfileViewModel = viewModel(navController.previousBackStackEntry!!) // Tenta pegar da tela anterior
+            val profileViewModel: ProfileViewModel = viewModel(navController.previousBackStackEntry!!)
             val currentUserData by profileViewModel.user.observeAsState()
             val updateStatus by profileViewModel.updateStatus.observeAsState(UpdateStatus.IDLE)
             val errorMessage by profileViewModel.errorMessage.observeAsState()
@@ -152,7 +177,7 @@ fun AppNavigation() {
             LaunchedEffect(errorMessage) {
                 errorMessage?.let { error ->
                     Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                    profileViewModel.resetUpdateStatus() // Ou resetar o erro
+                    profileViewModel.resetUpdateStatus()
                 }
             }
 
@@ -259,37 +284,55 @@ fun AppNavigation() {
             )
         }
 
+
         composable(
             route = "club/{clubId}",
             arguments = listOf(navArgument("clubId") { type = NavType.StringType })
         ) { backStackEntry ->
             val clubId = backStackEntry.arguments?.getString("clubId")
-            val clubViewModel: ClubViewModel = viewModel()
+                ?: return@composable // Garante que clubId não seja nulo
+
+            // Usa a key para garantir um ViewModel por clube diferente
+            val clubViewModel: ClubViewModel = viewModel(key = clubId)
+
             val toastMessage by clubViewModel.toastMessage.observeAsState()
             val context = LocalContext.current
 
-            LaunchedEffect(toastMessage) {
-                toastMessage?.let { message ->
-                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                    clubViewModel.onToastMessageShown()
+            LaunchedEffect(toastMessage) { /* ... (sem mudanças) ... */ }
+
+            // ⬇️ --- CÓDIGO ATUALIZADO PARA RECEBER LIVRO (CLUB) --- ⬇️
+            val bookResult = backStackEntry.savedStateHandle
+                .getLiveData<BookItem>(BOOK_SEARCH_RESULT_KEY)
+                .observeAsState()
+
+            LaunchedEffect(bookResult.value) {
+                bookResult.value?.let { bookItem ->
+                    Log.d("ClubNav", "Recebido o livro para indicar: ${bookItem.volumeInfo?.title}")
+                    // Chama a função correta no ClubViewModel
+                    clubViewModel.onBookSelectedFromSearch(bookItem) // ⬅️ CHAMADA AQUI
+                    backStackEntry.savedStateHandle.remove<BookItem>(BOOK_SEARCH_RESULT_KEY)
                 }
             }
+            // ⬆️ --- FIM CÓDIGO RECEBIMENTO (CLUB) --- ⬆️
 
-            if (clubId != null) {
-                ClubScreen(
-                    clubId = clubId,
-                    viewModel = clubViewModel,
-                    onBackClick = { navController.popBackStack() },
-                    onProfileClick = { userId ->
-                        navController.navigate("profile/$userId")
-                    },
-                    onAdminClick = {
-                        navController.navigate("club_admin/$clubId")
-                    }
-                )
-            }
+            ClubScreen(
+                clubId = clubId, // Passa o ID para a tela
+                viewModel = clubViewModel, // Passa o ViewModel
+                onBackClick = { navController.popBackStack() },
+                onProfileClick = { userId ->
+                    navController.navigate("profile/$userId")
+                },
+                onAdminClick = {
+                    navController.navigate("club_admin/$clubId")
+                },
+                // ⬇️ PASSA O LAMBDA PARA NAVEGAR PARA BUSCA ⬇️
+                onSearchBookClick = {
+                    navController.navigate("book_search")
+                }
+            )
         }
 
+        // ... (club_admin, edit_club, terms_and_policies - sem mudanças) ...
         composable(
             route = "club_admin/{clubId}",
             arguments = listOf(navArgument("clubId") { type = NavType.StringType })
@@ -356,6 +399,26 @@ fun AppNavigation() {
         composable("terms_and_policies") {
             TermsAndPoliciesScreen(
                 onBackClick = { navController.popBackStack() }
+            )
+        }
+
+
+        // ⬇️ --- ROTA "book_search" CORRIGIDA --- ⬇️
+        composable("book_search") {
+            BookSearchScreen(
+                onBookSelected = { selectedBook -> // selectedBook aqui é um BookItem
+                    // 1. Envia o BookItem Parcelable para a tela ANTERIOR
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set(BOOK_SEARCH_RESULT_KEY, selectedBook) // selectedBook é um BookItem
+
+                    // 2. Loga (Este log agora está correto)
+                    Log.d("BookSearch", "Livro selecionado: ${selectedBook.volumeInfo?.title}")
+
+                    // 3. Volta para a tela que chamou (Profile ou Club)
+                    navController.popBackStack()
+                },
+                onBackClick = { navController.popBackStack() } // Ação de cancelar
             )
         }
     }

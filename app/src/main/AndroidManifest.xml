@@ -14,7 +14,8 @@
         android:roundIcon="@mipmap/letraria_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.LetrariaApp"
-        tools:targetApi="31">
+        android:networkSecurityConfig="@xml/network_security_config"  tools:targetApi="31">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,6 +26,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
     </application>
 
 </manifest>
