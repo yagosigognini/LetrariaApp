@@ -35,6 +35,10 @@ import br.com.letrariaapp.ui.components.ClubsSection
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import coil.compose.AsyncImage
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.systemBars
+
 val homeButtonColor = Color(0xFFE57373)
 val homeTextColor = Color(0xFF2A3A6A)
 
@@ -49,13 +53,12 @@ fun HomeScreen(
     onClubClick: (BookClub) -> Unit
 ) {
     val user by viewModel.user.observeAsState()
-    // ✅ OBSERVANDO A NOVA LISTA DE CLUBES
     val clubs by viewModel.clubs.observeAsState(emptyList())
 
     HomeScreenContent(
         user = user,
         quote = sampleQuote,
-        clubs = clubs, // ✅ PASSANDO A LISTA REAL
+        clubs = clubs,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
         onCreateClubClick = onCreateClubClick,
@@ -79,11 +82,11 @@ fun HomeScreenContent(
     AppBackground(backgroundResId = R.drawable.app_background) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            contentPadding = WindowInsets.systemBars.asPaddingValues()
         ) {
             item {
                 HomeTopBar(
-                    // Mostra a URL da foto do usuário, ou um ícone padrão se for nulo
                     profileImageUrl = user?.profilePictureUrl,
                     onProfileClick = onProfileClick,
                     onSettingsClick = onSettingsClick
@@ -92,16 +95,25 @@ fun HomeScreenContent(
             item { Spacer(modifier = Modifier.height(32.dp)) }
             item { QuoteSection(quote = quote) }
             item { Spacer(modifier = Modifier.height(32.dp)) }
-            item {
-                ClubsSection(
-                    title = "Meus Clubes",
-                    clubs = clubs,
-                    onClubClick = onClubClick
-                )
+
+            // ✅ --- INÍCIO DA LÓGICA DE ESTADO VAZIO ---
+            if (clubs.isEmpty()) {
+                item {
+                    EmptyClubsSection() // Mostra a mensagem amigável
+                }
+            } else {
+                item {
+                    ClubsSection( // Mostra a lista de clubes
+                        title = "Meus Clubes",
+                        clubs = clubs,
+                        onClubClick = onClubClick
+                    )
+                }
             }
+            // ✅ --- FIM DA LÓGICA DE ESTADO VAZIO ---
+
             item { Spacer(modifier = Modifier.height(24.dp)) }
             item { ActionButtons(onCreateClubClick, onJoinClubClick) }
-            item { Spacer(modifier = Modifier.height(42.dp)) }
         }
     }
 }
@@ -121,8 +133,6 @@ fun HomeTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // --- MUDANÇA AQUI ---
-        // Agora usa AsyncImage para carregar a foto do usuário pela URL
         AsyncImage(
             model = profileImageUrl?.ifEmpty { R.drawable.ic_launcher_background },
             contentDescription = "Foto de Perfil",
@@ -131,7 +141,6 @@ fun HomeTopBar(
                 .clip(CircleShape)
                 .clickable(onClick = onProfileClick),
             contentScale = ContentScale.Crop,
-            // Mostra um ícone de pessoa como placeholder enquanto carrega ou se der erro
             placeholder = painterResource(id = R.drawable.ic_launcher_background),
             error = painterResource(id = R.drawable.ic_launcher_background)
         )
@@ -192,6 +201,32 @@ fun ActionButtons(onCreateClubClick: () -> Unit, onJoinClubClick: () -> Unit) {
     }
 }
 
+// ✅ --- NOVO COMPOSABLE ADICIONADO ---
+@Composable
+fun EmptyClubsSection() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp, vertical = 16.dp), // Padding para centralizar
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            "Você ainda não está em nenhum clube",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = homeTextColor
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "Crie um novo clube ou use a busca para encontrar um clube e participar!",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = homeTextColor.copy(alpha = 0.8f)
+        )
+    }
+}
+
 // --- PREVIEW ---
 
 @Preview(showBackground = true)
@@ -199,9 +234,27 @@ fun ActionButtons(onCreateClubClick: () -> Unit, onJoinClubClick: () -> Unit) {
 fun HomeScreenPreview() {
     LetrariaAppTheme {
         HomeScreenContent(
-            user = sampleUser, // O preview usa a tela "burra" com dados de exemplo
+            user = sampleUser,
             quote = sampleQuote,
-            clubs = sampleClubsList,
+            clubs = sampleClubsList, // O preview ainda mostra a lista cheia
+            onProfileClick = {},
+            onSettingsClick = {},
+            onCreateClubClick = {},
+            onJoinClubClick = {},
+            onClubClick = {}
+        )
+    }
+}
+
+// ✅ --- NOVO PREVIEW PARA O ESTADO VAZIO ---
+@Preview(showBackground = true, name = "Home Screen Vazia")
+@Composable
+fun HomeScreenEmptyPreview() {
+    LetrariaAppTheme {
+        HomeScreenContent(
+            user = sampleUser,
+            quote = sampleQuote,
+            clubs = emptyList(), // Passando uma lista vazia
             onProfileClick = {},
             onSettingsClick = {},
             onCreateClubClick = {},

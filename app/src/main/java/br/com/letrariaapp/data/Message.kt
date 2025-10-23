@@ -10,6 +10,11 @@ data class Message(
     val senderName: String = "", // Para exibir o nome sem buscar o usuário toda hora
     val senderPhotoUrl: String = "", // Para exibir a foto sem buscar o usuário toda hora
 
+    val type: String = "USER", // Tipos: "USER" ou "INDICATION"
+
+    // ✅ NOVO: Armazena os dados do livro, se a mensagem for do tipo "INDICATION"
+    val indicatedBook: IndicatedBook? = null,
+
     // Anotação especial que diz ao Firestore para preencher este campo com a hora do servidor
     @ServerTimestamp
     val timestamp: Date? = null

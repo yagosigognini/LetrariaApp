@@ -20,9 +20,24 @@ data class JoinRequest(
     val user: User
 )
 
+// Resultado da ação de sair
+sealed class LeaveClubResult {
+    data object IDLE : LeaveClubResult()
+    data object SUCCESS : LeaveClubResult()
+    data class ERROR(val message: String) : LeaveClubResult()
+}
+
+// ✅ NOVO: Resultado da ação de excluir
+sealed class DeleteClubResult {
+    data object IDLE : DeleteClubResult()
+    data object SUCCESS : DeleteClubResult()
+}
+
 class AdminViewModel : ViewModel() {
     private val db = Firebase.firestore
     private val auth = Firebase.auth
+
+    val currentUserId = auth.currentUser?.uid
 
     private val _club = MutableLiveData<BookClub?>()
     val club: LiveData<BookClub?> = _club
@@ -30,7 +45,6 @@ class AdminViewModel : ViewModel() {
     private val _requests = MutableLiveData<List<JoinRequest>>()
     val requests: LiveData<List<JoinRequest>> = _requests
 
-    // ✅ NOVO: LiveData para a lista de membros (para a aba "Membros")
     private val _members = MutableLiveData<List<User>>()
     val members: LiveData<List<User>> = _members
 
@@ -40,6 +54,16 @@ class AdminViewModel : ViewModel() {
     private val _isLoadingMembers = MutableLiveData(false)
     val isLoadingMembers: LiveData<Boolean> = _isLoadingMembers
 
+    private val _toastMessage = MutableLiveData<String?>(null)
+    val toastMessage: LiveData<String?> = _toastMessage
+
+    private val _leaveResult = MutableLiveData<LeaveClubResult>(LeaveClubResult.IDLE)
+    val leaveResult: LiveData<LeaveClubResult> = _leaveResult
+
+    // ✅ VARIÁVEL QUE FALTAVA
+    private val _clubDeleted = MutableLiveData<DeleteClubResult>(DeleteClubResult.IDLE)
+    val clubDeleted: LiveData<DeleteClubResult> = _clubDeleted
+
     private lateinit var currentClubId: String
 
     fun loadAdminData(clubId: String) {
@@ -47,7 +71,6 @@ class AdminViewModel : ViewModel() {
         _isLoadingRequests.value = true
         _isLoadingMembers.value = true
 
-        // "Ouve" o documento do clube em tempo real
         db.collection("clubs").document(clubId)
             .addSnapshotListener { clubSnapshot, error ->
                 if (error != null || clubSnapshot == null) {
@@ -66,7 +89,6 @@ class AdminViewModel : ViewModel() {
                     return@addSnapshotListener
                 }
 
-                // 1. Processa a lista de SOLICITAÇÕES
                 val requestIds = clubData.joinRequests
                 if (requestIds.isEmpty()) {
                     _requests.value = emptyList()
@@ -75,7 +97,6 @@ class AdminViewModel : ViewModel() {
                     fetchUsersFromIds(requestIds, isRequest = true)
                 }
 
-                // 2. Processa a lista de MEMBROS
                 val memberIds = clubData.members
                 if (memberIds.isEmpty()) {
                     _members.value = emptyList()
@@ -87,27 +108,30 @@ class AdminViewModel : ViewModel() {
     }
 
     private fun fetchUsersFromIds(userIds: List<String>, isRequest: Boolean) {
+        if (userIds.isEmpty()) {
+            if (isRequest) _isLoadingRequests.value = false else _isLoadingMembers.value = false
+            return
+        }
+
         viewModelScope.launch {
             try {
                 val usersSnapshot = db.collection("users").whereIn("uid", userIds).get().await()
                 val users = usersSnapshot.toObjects(User::class.java)
 
                 if (isRequest) {
-                    // Mapeia para a lista de solicitações
                     val joinRequests = userIds.mapNotNull { id ->
                         users.find { it.uid == id }?.let { user ->
                             JoinRequest(userId = id, user = user)
                         }
                     }
                     _requests.value = joinRequests
-                    _isLoadingRequests.value = false
                 } else {
-                    // Mapeia para a lista de membros
                     _members.value = users
-                    _isLoadingMembers.value = false
                 }
             } catch (e: Exception) {
                 Log.e("AdminViewModel", "Erro ao buscar perfis de usuários", e)
+                if (isRequest) _requests.value = emptyList() else _members.value = emptyList()
+            } finally {
                 if (isRequest) _isLoadingRequests.value = false else _isLoadingMembers.value = false
             }
         }
@@ -127,27 +151,134 @@ class AdminViewModel : ViewModel() {
                     transaction.update(clubRef, "members", FieldValue.arrayUnion(userId))
                     null
                 }.await()
+                _toastMessage.value = "Usuário aprovado!"
             } catch (e: Exception) {
                 Log.e("AdminViewModel", "Erro ao aprovar usuário", e)
-                // TODO: Enviar Toast de erro para a UI
+                _toastMessage.value = e.message ?: "Erro ao aprovar."
             }
         }
     }
 
     fun denyRequest(userId: String) {
-        // ... (esta função continua a mesma)
+        viewModelScope.launch {
+            try {
+                db.collection("clubs").document(currentClubId)
+                    .update("joinRequests", FieldValue.arrayRemove(userId))
+                    .await()
+                _toastMessage.value = "Usuário negado."
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Erro ao negar usuário", e)
+                _toastMessage.value = "Erro ao negar."
+            }
+        }
     }
 
-    // ✅ NOVA FUNÇÃO: Para expulsar um membro
     fun kickMember(userId: String) {
         viewModelScope.launch {
             try {
                 db.collection("clubs").document(currentClubId)
                     .update("members", FieldValue.arrayRemove(userId))
                     .await()
+                _toastMessage.value = "Membro removido."
             } catch (e: Exception) {
                 Log.e("AdminViewModel", "Erro ao expulsar membro", e)
+                _toastMessage.value = "Erro ao remover membro."
             }
         }
+    }
+
+    fun leaveClub() {
+        viewModelScope.launch {
+            if (currentUserId == null) return@launch
+
+            val currentClub = _club.value
+            if (currentClub == null) {
+                _toastMessage.value = "Erro: Clube não encontrado."
+                return@launch
+            }
+
+            if (currentClub.adminId == currentUserId) {
+                _toastMessage.value = "Admins não podem sair. Transfira a administração primeiro."
+                return@launch
+            }
+
+            try {
+                db.collection("clubs").document(currentClubId)
+                    .update("members", FieldValue.arrayRemove(currentUserId))
+                    .await()
+                _toastMessage.value = "Você saiu do clube."
+                _leaveResult.value = LeaveClubResult.SUCCESS
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Erro ao sair do clube", e)
+                _leaveResult.value = LeaveClubResult.ERROR("Erro ao sair do clube.")
+            }
+        }
+    }
+
+    fun drawUserForCycle() {
+        viewModelScope.launch {
+            val currentClub = _club.value
+            val adminId = auth.currentUser?.uid
+
+            if (currentClub == null || adminId == null || currentClub.adminId != adminId) {
+                _toastMessage.value = "Apenas o admin pode sortear."
+                return@launch
+            }
+            if (currentClub.members.isEmpty()) {
+                _toastMessage.value = "Não há membros no clube para sortear."
+                return@launch
+            }
+
+            val randomUserId = currentClub.members.random()
+            val updates = mapOf(
+                "currentUserForCycleId" to randomUserId,
+                "indicatedBook" to null,
+                "cycleEndDate" to null
+            )
+
+            try {
+                db.collection("clubs").document(currentClub.id).update(updates).await()
+                _toastMessage.value = "Novo usuário sorteado!"
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Erro ao sortear usuário", e)
+                _toastMessage.value = "Erro ao tentar sortear usuário."
+            }
+        }
+    }
+
+    // ✅ FUNÇÃO QUE FALTAVA
+    fun deleteClub() {
+        viewModelScope.launch {
+            val currentClub = _club.value
+            if (currentClub == null || currentUserId == null) {
+                _toastMessage.value = "Erro: Clube não encontrado."
+                return@launch
+            }
+            if (currentClub.adminId != currentUserId) {
+                _toastMessage.value = "Apenas o admin pode excluir o clube."
+                return@launch
+            }
+            if (currentClub.members.size > 1) {
+                _toastMessage.value = "Você precisa ser o único membro para excluir o clube."
+                return@launch
+            }
+
+            try {
+                db.collection("clubs").document(currentClubId).delete().await()
+                _toastMessage.value = "Clube excluído com sucesso."
+                _clubDeleted.value = DeleteClubResult.SUCCESS
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Erro ao excluir clube", e)
+                _toastMessage.value = "Erro ao excluir o clube."
+            }
+        }
+    }
+
+    fun onToastMessageShown() {
+        _toastMessage.value = null
+    }
+
+    fun resetLeaveResult() {
+        _leaveResult.value = LeaveClubResult.IDLE
     }
 }

@@ -5,6 +5,10 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+// ✅ --- IMPORTS ADICIONADOS ---
+import com.google.firebase.auth.AuthCredential
+import com.google.firebase.auth.GoogleAuthProvider
+// ---
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -71,6 +75,7 @@ class AuthViewModel : ViewModel() {
                 Log.d(TAG, "E-mail de verificação enviado.")
 
                 if (user?.uid != null) {
+                    // ✅ A função agora usa o parâmetro padrão (null) para a foto
                     saveUserToFirestore(user.uid, name, email)
                     _authResult.value = AuthResult.SUCCESS
                     Log.d(TAG, "Registro realizado com sucesso")
@@ -84,8 +89,13 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    private suspend fun saveUserToFirestore(uid: String, name: String, email: String) {
-        val avatarUrl = "https://ui-avatars.com/api/?name=${name.replace(" ", "+")}&background=random"
+    // ✅ --- FUNÇÃO ATUALIZADA ---
+    // Agora aceita uma photoUrl opcional
+    private suspend fun saveUserToFirestore(uid: String, name: String, email: String, photoUrl: String? = null) {
+        // Se a photoUrl for nula (ex: cadastro por e-mail), gera um avatar.
+        // Se não (ex: login com Google), usa a foto do Google.
+        val avatarUrl = photoUrl ?: "https://ui-avatars.com/api/?name=${name.replace(" ", "+")}&background=random"
+
         val user = hashMapOf(
             "uid" to uid,
             "name" to name,
@@ -96,7 +106,58 @@ class AuthViewModel : ViewModel() {
             "checklist" to emptyList<Any>(),
             "clubs" to emptyList<Any>()
         )
+        // Usamos .set(user, SetOptions.merge()) para não sobrescrever dados
+        // caso o usuário já exista (o que não deve acontecer com a lógica de new user)
         firestore.collection("users").document(uid).set(user).await()
+    }
+
+    // ✅ --- NOVA FUNÇÃO DE LOGIN COM GOOGLE ---
+    fun signInWithGoogle(credential: AuthCredential, onLoginSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _authResult.value = AuthResult.LOADING
+            try {
+                val result = auth.signInWithCredential(credential).await()
+                val user = result.user
+                val isNewUser = result.additionalUserInfo?.isNewUser == true
+
+                // Se for um usuário novo, salvamos no Firestore
+                if (isNewUser && user != null) {
+                    saveUserToFirestore(
+                        uid = user.uid,
+                        name = user.displayName ?: "Usuário",
+                        email = user.email ?: "",
+                        photoUrl = user.photoUrl?.toString()
+                    )
+                }
+
+                // Se for um usuário existente, ele só faz o login
+                _authResult.value = AuthResult.SUCCESS
+                onLoginSuccess()
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro no login com Google", e)
+                _authResult.value = AuthResult.ERROR(e.message ?: "Erro desconhecido no login com Google.")
+            }
+        }
+    }
+
+
+    fun sendPasswordReset(email: String) {
+        if (email.isBlank()) {
+            _authResult.value = AuthResult.ERROR("Por favor, digite seu e-mail no campo acima.")
+            return
+        }
+
+        viewModelScope.launch {
+            _authResult.value = AuthResult.LOADING
+            try {
+                auth.sendPasswordResetEmail(email).await()
+                _authResult.value = AuthResult.ERROR("E-mail de redefinição enviado! Verifique sua caixa de entrada.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao redefinir senha", e)
+                _authResult.value = AuthResult.ERROR(e.message ?: "Falha ao enviar e-mail.")
+            }
+        }
     }
 
     fun logout() {

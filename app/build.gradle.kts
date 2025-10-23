@@ -63,6 +63,8 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
 
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+
     // --- Coroutines ---
     // Permite usar .await() em tarefas do Firebase/Google Play Services
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.0")

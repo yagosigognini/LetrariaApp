@@ -21,17 +21,24 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.letrariaapp.R
 import br.com.letrariaapp.data.BookClub
 import br.com.letrariaapp.data.User
-import br.com.letrariaapp.data.sampleClubsList // ✅ IMPORT ADICIONADO
+import br.com.letrariaapp.data.sampleClubsList
 import br.com.letrariaapp.data.sampleUser
 import br.com.letrariaapp.ui.components.AppBackground
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import coil.compose.AsyncImage
 
 @Composable
 fun AdminScreen(
     clubId: String,
     viewModel: AdminViewModel = viewModel(),
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onLeaveClub: () -> Unit,
+    onDrawUser: () -> Unit,
+    onEditClub: () -> Unit
 ) {
     LaunchedEffect(clubId) {
         viewModel.loadAdminData(clubId)
@@ -43,16 +50,23 @@ fun AdminScreen(
     val isLoadingRequests by viewModel.isLoadingRequests.observeAsState(false)
     val isLoadingMembers by viewModel.isLoadingMembers.observeAsState(false)
 
+    val isAdmin = club?.adminId == viewModel.currentUserId
+
     AdminScreenContent(
         club = club,
         requests = requests,
         members = members,
         isLoadingRequests = isLoadingRequests,
         isLoadingMembers = isLoadingMembers,
+        isAdmin = isAdmin,
         onBackClick = onBackClick,
         onApprove = { request -> viewModel.approveRequest(request.userId) },
         onDeny = { request -> viewModel.denyRequest(request.userId) },
-        onKick = { member -> viewModel.kickMember(member.uid) }
+        onKick = { member -> viewModel.kickMember(member.uid) },
+        onLeaveClub = onLeaveClub,
+        onDrawUser = onDrawUser,
+        onEditClub = onEditClub, // ✅ Passando o parâmetro recebido
+        onDeleteClub = { viewModel.deleteClub() } // ✅ Criando a lambda para deletar
     )
 }
 
@@ -64,25 +78,35 @@ fun AdminScreenContent(
     members: List<User>,
     isLoadingRequests: Boolean,
     isLoadingMembers: Boolean,
+    isAdmin: Boolean,
     onBackClick: () -> Unit,
     onApprove: (JoinRequest) -> Unit,
     onDeny: (JoinRequest) -> Unit,
-    onKick: (User) -> Unit
+    onKick: (User) -> Unit,
+    onLeaveClub: () -> Unit,
+    onDrawUser: () -> Unit,
+    onEditClub: () -> Unit, // ✅ Recebendo o parâmetro
+    onDeleteClub: () -> Unit  // ✅ Recebendo o parâmetro
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
-    val tabs = listOf("Solicitações", "Membros", "Configurações")
+
+    val tabs = remember(isAdmin) {
+        if (isAdmin) listOf("Solicitações", "Membros", "Configurações")
+        else listOf("Membros", "Configurações")
+    }
 
     AppBackground(backgroundResId = R.drawable.background) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Painel do Admin") },
+                    title = { Text(if (isAdmin) "Painel do Admin" else "Configurações do Clube") },
                     navigationIcon = {
                         IconButton(onClick = onBackClick) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    windowInsets = WindowInsets.statusBars
                 )
             },
             containerColor = Color.Transparent
@@ -98,10 +122,19 @@ fun AdminScreenContent(
                     }
                 }
 
-                when (selectedTabIndex) {
-                    0 -> RequestsTab(requests, isLoadingRequests, onApprove, onDeny)
-                    1 -> MembersTab(members, isLoadingMembers, club?.adminId, onKick)
-                    2 -> ConfigTab(club)
+                if (isAdmin) {
+                    when (selectedTabIndex) {
+                        0 -> RequestsTab(requests, isLoadingRequests, onApprove, onDeny)
+                        1 -> MembersTab(members, isLoadingMembers, club?.adminId, isAdmin, onKick)
+                        // ✅ Passando os novos parâmetros para a ConfigTab
+                        2 -> ConfigTab(club, isAdmin, onLeaveClub, onDrawUser, onEditClub, onDeleteClub)
+                    }
+                } else {
+                    when (selectedTabIndex) {
+                        0 -> MembersTab(members, isLoadingMembers, club?.adminId, isAdmin, onKick)
+                        // ✅ Passando os novos parâmetros para a ConfigTab
+                        1 -> ConfigTab(club, isAdmin, onLeaveClub, onDrawUser, onEditClub, onDeleteClub)
+                    }
                 }
             }
         }
@@ -145,6 +178,7 @@ fun MembersTab(
     members: List<User>,
     isLoading: Boolean,
     adminId: String?,
+    currentUserIsAdmin: Boolean,
     onKick: (User) -> Unit
 ) {
     if (isLoading) {
@@ -159,7 +193,8 @@ fun MembersTab(
             items(members) { user ->
                 MemberItem(
                     user = user,
-                    isAdmin = user.uid == adminId,
+                    isThisMemberAdmin = user.uid == adminId,
+                    currentUserIsAdmin = currentUserIsAdmin,
                     onKick = { onKick(user) }
                 )
             }
@@ -168,16 +203,27 @@ fun MembersTab(
 }
 
 @Composable
-fun ConfigTab(club: BookClub?) {
+fun ConfigTab(
+    club: BookClub?,
+    isAdmin: Boolean,
+    onLeaveClub: () -> Unit,
+    onDrawUser: () -> Unit,
+    onEditClub: () -> Unit, // ✅ Recebendo o parâmetro
+    onDeleteClub: () -> Unit  // ✅ Recebendo o parâmetro
+) {
+    // ✅ Estado para controlar o diálogo de confirmação de exclusão
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         if (club == null) {
             CircularProgressIndicator()
             return
         }
 
+        Text("Configurações do Clube", style = MaterialTheme.typography.titleLarge)
+        Spacer(modifier = Modifier.height(16.dp))
+
         if (club.code != null) {
-            Text("Configurações do Clube", style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
                 value = club.code,
                 onValueChange = {},
@@ -185,9 +231,84 @@ fun ConfigTab(club: BookClub?) {
                 readOnly = true,
                 modifier = Modifier.fillMaxWidth()
             )
-        } else {
-            Text("Este é um clube público e não possui código de convite.")
+            Spacer(modifier = Modifier.height(16.dp))
         }
+
+        if (isAdmin) {
+            Button(
+                onClick = onDrawUser,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Sortear Novo Usuário")
+            }
+            Spacer(modifier = Modifier.height(16.dp)) // ✅ Espaçamento ajustado
+
+            // ✅ ---- BOTÃO DE EDITAR CLUBE ----
+            Button(
+                onClick = onEditClub,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("EDITAR INFORMAÇÕES DO CLUBE")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ✅ ---- BOTÃO DE DELETAR CLUBE ----
+            Button(
+                onClick = { showDeleteDialog = true }, // Abre o diálogo
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("DELETAR CLUBE", color = MaterialTheme.colorScheme.onError)
+            }
+            Text(
+                "Só é possível deletar se você for o único membro.",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+
+        Button(
+            onClick = onLeaveClub,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        ) {
+            Text(
+                text = if (isAdmin) "Transferir Administração" else "Sair do Clube",
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+        }
+        if (isAdmin) {
+            Text(
+                "Admins não podem sair, devem transferir a administração.",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+
+    // ✅ ---- DIÁLOGO DE CONFIRMAÇÃO DE EXCLUSÃO ----
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Confirmar Exclusão") },
+            text = { Text("Tem certeza que deseja excluir este clube? Esta ação não pode ser desfeita.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteClub() // Chama a função do ViewModel
+                        showDeleteDialog = false
+                    }
+                ) {
+                    Text("EXCLUIR")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("CANCELAR")
+                }
+            }
+        )
     }
 }
 
@@ -228,7 +349,8 @@ fun RequestItem(
 @Composable
 fun MemberItem(
     user: User,
-    isAdmin: Boolean,
+    isThisMemberAdmin: Boolean,
+    currentUserIsAdmin: Boolean,
     onKick: () -> Unit
 ) {
     Card(
@@ -248,12 +370,12 @@ fun MemberItem(
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(user.name, fontWeight = FontWeight.Bold)
-                if(isAdmin) {
+                if(isThisMemberAdmin) {
                     Text("Admin", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
 
-            if (!isAdmin) {
+            if (currentUserIsAdmin && !isThisMemberAdmin) {
                 TextButton(onClick = onKick) {
                     Text("Expulsar", color = MaterialTheme.colorScheme.error)
                 }
@@ -262,7 +384,6 @@ fun MemberItem(
     }
 }
 
-// ✅ PREVIEW CORRIGIDO
 @Preview(showBackground = true)
 @Composable
 fun AdminScreenPreview() {
@@ -283,10 +404,15 @@ fun AdminScreenPreview() {
             members = members,
             isLoadingRequests = false,
             isLoadingMembers = false,
+            isAdmin = true,
             onBackClick = {},
             onApprove = {},
             onDeny = {},
-            onKick = {}
+            onKick = {},
+            onLeaveClub = {},
+            onDrawUser = {},
+            onEditClub = {}, // ✅ Atualizado no preview
+            onDeleteClub = {}  // ✅ Atualizado no preview
         )
     }
 }

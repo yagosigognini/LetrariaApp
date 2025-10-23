@@ -10,14 +10,15 @@ data class BookClub(
     val adminId: String = "",
     val members: List<String> = emptyList(),
     val maxMembers: Int = 10,
-    val readingCycleDays: Int = 15,
+    var readingCycleDays: Int = 15, // Deixamos como 'var' para poder ser alterado
 
+    // --- Campos do Ciclo de Leitura ---
     val currentUserForCycleId: String? = null,
-    val indicatedBookTitle: String? = null,
+    val indicatedBook: IndicatedBook? = null, // Substitui o 'indicatedBookTitle'
     val cycleEndDate: Long? = null,
 
-    // ✅ NOVO CAMPO ADICIONADO
-    val joinRequests: List<String> = emptyList(), // Lista de User IDs que pediram para entrar
+    // --- Campo das Solicitações ---
+    val joinRequests: List<String> = emptyList(),
 
     val createdAt: Long = System.currentTimeMillis()
 )

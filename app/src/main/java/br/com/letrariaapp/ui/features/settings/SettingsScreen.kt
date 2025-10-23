@@ -6,6 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -24,8 +28,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.letrariaapp.R
 import br.com.letrariaapp.ui.components.AppBackground
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
-import br.com.letrariaapp.ui.features.settings.SettingsScreen
-import br.com.letrariaapp.ui.features.settings.SettingsViewModel
 
 // --- TELA "INTELIGENTE" (STATEFUL) ---
 @Composable
@@ -33,18 +35,18 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(),
     onBackClick: () -> Unit,
     onLogoutClick: () -> Unit,
-    onDeleteAccount: () -> Unit // ✅ Ação para deletar a conta
+    onDeleteAccount: () -> Unit,
+    onTermsClick: () -> Unit
 ) {
     val userEmail by remember { mutableStateOf(viewModel.userEmail) }
     val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    // ✅ Mostra a caixa de diálogo se o estado for verdadeiro
     if (showDeleteDialog) {
         DeleteAccountDialog(
             onConfirm = {
                 showDeleteDialog = false
-                onDeleteAccount() // Chama a função do ViewModel
+                onDeleteAccount()
             },
             onDismiss = { showDeleteDialog = false }
         )
@@ -54,7 +56,6 @@ fun SettingsScreen(
         userEmail = userEmail,
         onBackClick = onBackClick,
         onPasswordResetClick = { viewModel.sendPasswordResetEmail() },
-        onThemeChangeClick = { /* TODO */ },
         onFeedbackClick = {
             val intent = Intent(Intent.ACTION_SENDTO).apply {
                 data = Uri.parse("mailto:")
@@ -63,9 +64,9 @@ fun SettingsScreen(
             }
             try { context.startActivity(intent) } catch (e: Exception) { /* Lida com erro */ }
         },
-        onTermsClick = { /* TODO */ },
+        onTermsClick = onTermsClick,
         onLogoutClick = onLogoutClick,
-        onDeleteAccountClick = { showDeleteDialog = true } // ✅ Apenas mostra o diálogo
+        onDeleteAccountClick = { showDeleteDialog = true }
     )
 }
 
@@ -76,7 +77,6 @@ fun SettingsScreenContent(
     userEmail: String,
     onBackClick: () -> Unit,
     onPasswordResetClick: () -> Unit,
-    onThemeChangeClick: () -> Unit,
     onFeedbackClick: () -> Unit,
     onTermsClick: () -> Unit,
     onLogoutClick: () -> Unit,
@@ -93,7 +93,8 @@ fun SettingsScreenContent(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    windowInsets = WindowInsets.statusBars
                 )
             }
         ) { paddingValues ->
@@ -115,7 +116,7 @@ fun SettingsScreenContent(
                 // Seção de Preferências
                 Text("Preferências", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                ClickableRow(label = "Tema", value = "Claro", onClick = onThemeChangeClick)
+                InfoRow(label = "Tema", value = "Padrão do Sistema")
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -128,33 +129,12 @@ fun SettingsScreenContent(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Ações Finais
-                Button(
-                    onClick = onLogoutClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Sair da conta", color = MaterialTheme.colorScheme.onSecondaryContainer)
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = onDeleteAccountClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Excluir conta", color = MaterialTheme.colorScheme.onErrorContainer)
-                }
+                // ... (Botões de Sair e Excluir)
             }
         }
     }
 }
 
-// ✅ NOVO COMPONENTE: Caixa de diálogo para confirmação
 @Composable
 fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
@@ -181,7 +161,9 @@ fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 @Composable
 private fun InfoRow(label: String, value: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -194,7 +176,10 @@ private fun InfoRow(label: String, value: String) {
 @Composable
 private fun ClickableRow(label: String, value: String? = null, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -218,9 +203,74 @@ fun SettingsScreenPreview() {
         SettingsScreenContent(
             userEmail = "fulanodetal@gmail.com",
             onBackClick = {}, onPasswordResetClick = {},
-            onThemeChangeClick = {}, onFeedbackClick = {},
+            onFeedbackClick = {},
             onTermsClick = {}, onLogoutClick = {},
             onDeleteAccountClick = {}
         )
+    }
+}
+
+// --- TELA DE TERMOS E POLÍTICAS ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TermsAndPoliciesScreen(
+    onBackClick: () -> Unit
+) {
+    AppBackground(backgroundResId = R.drawable.background) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Termos e Políticas") },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    windowInsets = WindowInsets.statusBars
+                )
+            }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // ✅ --- TEXTO MODELO ADICIONADO ---
+                Text(
+                    "Termos de Uso",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Bem-vindo ao Letraria! Ao usar nosso aplicativo, você concorda com estes termos. \n\n" +
+                            "1. Contas de Usuário: Você é responsável por manter a confidencialidade da sua conta e senha. Você concorda em aceitar a responsabilidade por todas as atividades que ocorram sob sua conta.\n\n" +
+                            "2. Conteúdo Gerado pelo Usuário: Você é o único responsável pelo conteúdo (mensagens, indicações de livros, etc.) que publica nos clubes de leitura. Você não deve postar conteúdo ilegal, odioso ou difamatório.\n\n" +
+                            "3. Administração do Clube: Os administradores do clube têm o poder de adicionar ou remover membros de seus respectivos clubes. O Letraria não se responsabiliza por disputas de gerenciamento de clube.\n\n" +
+                            "4. Rescisão: Podemos rescindir ou suspender seu acesso ao nosso serviço imediatamente, sem aviso prévio ou responsabilidade, por qualquer motivo, incluindo violação destes Termos.\n\n" +
+                            "Estes termos são um modelo para um projeto acadêmico.",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    "Política de Privacidade",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Esta política descreve como coletamos e usamos seus dados.\n\n" +
+                            "1. Coleta de Dados: Coletamos as informações que você fornece durante o cadastro (nome, e-mail). Se você usar o Login do Google, coletamos o ID, nome e foto do perfil fornecidos pelo Google.\n\n" +
+                            "2. Uso de Dados: Usamos seus dados para identificar você no aplicativo, exibir seu perfil para outros membros do clube e permitir a funcionalidade principal do aplicativo. Não vendemos seus dados a terceiros.\n\n" +
+                            "3. Exclusão de Conta: Você pode excluir sua conta a qualquer momento através da tela de 'Configurações'. Ao fazer isso, todos os seus dados pessoais e conteúdo gerado (mensagens, etc.) serão permanentemente removidos de nossos servidores.\n\n" +
+                            "Esta política é um modelo para um projeto acadêmico.",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
     }
 }

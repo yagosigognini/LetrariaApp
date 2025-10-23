@@ -3,7 +3,7 @@ package br.com.letrariaapp.ui.features.settings
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModel // ✅ VOLTOU A SER UM VIEWMODEL NORMAL
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.ktx.auth
@@ -11,8 +11,11 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+// ✅ CLASSE VOLTOU AO NORMAL (NÃO É MAIS AndroidViewModel)
 class SettingsViewModel : ViewModel() {
     private val auth = Firebase.auth
+
+    // ✅ --- TODA A LÓGICA DE TEMA FOI REMOVIDA DAQUI ---
 
     private val _toastMessage = MutableLiveData<String?>(null)
     val toastMessage: LiveData<String?> = _toastMessage

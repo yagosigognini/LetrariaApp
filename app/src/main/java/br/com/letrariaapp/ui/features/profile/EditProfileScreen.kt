@@ -12,6 +12,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+// ✅ --- IMPORTS ADICIONADOS ---
+import androidx.compose.ui.graphics.Color
+import br.com.letrariaapp.ui.components.AppBackground
+// ---
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -40,69 +44,77 @@ fun EditProfileScreen(
 
     val isLoading = updateStatus == UpdateStatus.LOADING
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Editar Perfil") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-                    }
-                },
-                actions = {
-                    TextButton(
-                        enabled = !isLoading,
-                        onClick = { onSaveClick(name, aboutMe, newImageUri) }
-                    ) {
-                        Text("Salvar", fontWeight = FontWeight.Bold)
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                AsyncImage(
-                    model = newImageUri ?: currentUser.profilePictureUrl.ifEmpty { R.drawable.ic_launcher_background },
-                    contentDescription = "Foto de Perfil",
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-                TextButton(onClick = { imagePickerLauncher.launch("image/*") }) {
-                    Text("Alterar Foto")
-                }
-                Spacer(modifier = Modifier.height(32.dp))
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nome") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = aboutMe,
-                    onValueChange = { aboutMe = it },
-                    label = { Text("Sobre Mim") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp)
+    // ✅ --- 1. ENVOLVENDO COM O APPBACKGROUND ---
+    AppBackground(backgroundResId = R.drawable.background) {
+        Scaffold(
+            // ✅ --- 2. DEIXANDO O SCAFFOLD TRANSPARENTE ---
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Editar Perfil") },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                        }
+                    },
+                    actions = {
+                        TextButton(
+                            enabled = !isLoading,
+                            onClick = { onSaveClick(name, aboutMe, newImageUri) }
+                        ) {
+                            Text("Salvar", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    // ✅ --- 3. ADICIONANDO OS INSETS (QUE JÁ FIZEMOS ANTES) ---
+                    windowInsets = WindowInsets.statusBars,
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                 )
             }
-            if (isLoading) {
-                CircularProgressIndicator()
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AsyncImage(
+                        model = newImageUri ?: currentUser.profilePictureUrl.ifEmpty { R.drawable.ic_launcher_background },
+                        contentDescription = "Foto de Perfil",
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    TextButton(onClick = { imagePickerLauncher.launch("image/*") }) {
+                        Text("Alterar Foto")
+                    }
+                    Spacer(modifier = Modifier.height(32.dp))
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Nome") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = aboutMe,
+                        onValueChange = { aboutMe = it },
+                        label = { Text("Sobre Mim") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                    )
+                }
+                if (isLoading) {
+                    CircularProgressIndicator()
+                }
             }
         }
     }

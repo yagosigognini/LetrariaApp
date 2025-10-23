@@ -68,7 +68,7 @@ class ClubDetailsViewModel : ViewModel() {
             }
     }
 
-    // ✅ --- LÓGICA DE PARTICIPAR ATUALIZADA ---
+    // Lógica para entrar em clube PÚBLICO (quando o usuário vê o card)
     fun joinClub() {
         viewModelScope.launch {
             val userId = auth.currentUser?.uid
@@ -79,22 +79,16 @@ class ClubDetailsViewModel : ViewModel() {
                 return@launch
             }
 
-            // 1. Verifica se o usuário já é membro
             if (currentClub.members.contains(userId)) {
                 _joinResult.value = JoinClubResult.ERROR("Você já é membro deste clube.")
                 return@launch
             }
-
-            // 2. Verifica se o usuário já solicitou
             if (currentClub.joinRequests.contains(userId)) {
                 _joinResult.value = JoinClubResult.ERROR("Você já enviou uma solicitação para este clube.")
                 return@launch
             }
 
             try {
-                // ✅ MUDANÇA PRINCIPAL:
-                // Adiciona o ID do usuário ao array 'joinRequests' no Firestore,
-                // em vez de adicioná-lo diretamente ao 'members'.
                 db.collection("clubs").document(currentClub.id)
                     .update("joinRequests", FieldValue.arrayUnion(userId))
                     .await()
@@ -103,6 +97,64 @@ class ClubDetailsViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.e("ClubDetailsVM", "Erro ao enviar solicitação", e)
                 _joinResult.value = JoinClubResult.ERROR("Ocorreu um erro ao enviar sua solicitação.")
+            }
+        }
+    }
+
+    // ✅ --- NOVA FUNÇÃO PARA ENTRAR COM CÓDIGO ---
+    fun requestToJoinByCode(code: String) {
+        viewModelScope.launch {
+            val userId = auth.currentUser?.uid
+            if (userId == null) {
+                _joinResult.value = JoinClubResult.ERROR("Usuário não autenticado.")
+                return@launch
+            }
+            if (code.isBlank()) {
+                _joinResult.value = JoinClubResult.ERROR("O código não pode estar vazio.")
+                return@launch
+            }
+
+            try {
+                // 1. Busca no Firestore pelo clube com o código informado
+                val querySnapshot = db.collection("clubs")
+                    .whereEqualTo("code", code)
+                    .limit(1) // O código deve ser único
+                    .get()
+                    .await()
+
+                if (querySnapshot.isEmpty) {
+                    _joinResult.value = JoinClubResult.ERROR("Nenhum clube encontrado com este código.")
+                    return@launch
+                }
+
+                val clubDocument = querySnapshot.documents.first()
+                val club = clubDocument.toObject(BookClub::class.java)
+
+                if (club == null) {
+                    _joinResult.value = JoinClubResult.ERROR("Erro ao ler dados do clube.")
+                    return@launch
+                }
+
+                // 2. Reutiliza as mesmas verificações da função joinClub()
+                if (club.members.contains(userId)) {
+                    _joinResult.value = JoinClubResult.ERROR("Você já é membro deste clube.")
+                    return@launch
+                }
+                if (club.joinRequests.contains(userId)) {
+                    _joinResult.value = JoinClubResult.ERROR("Você já enviou uma solicitação para este clube.")
+                    return@launch
+                }
+
+                // 3. Adiciona a solicitação ao clube encontrado
+                db.collection("clubs").document(club.id)
+                    .update("joinRequests", FieldValue.arrayUnion(userId))
+                    .await()
+
+                _joinResult.value = JoinClubResult.SUCCESS("Solicitação enviada ao admin do clube!")
+
+            } catch (e: Exception) {
+                Log.e("ClubDetailsVM", "Erro ao solicitar por código", e)
+                _joinResult.value = JoinClubResult.ERROR("Erro ao processar sua solicitação.")
             }
         }
     }

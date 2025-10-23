@@ -19,9 +19,13 @@ import androidx.navigation.navArgument
 import br.com.letrariaapp.ui.features.auth.AuthViewModel
 import br.com.letrariaapp.ui.features.auth.LoginScreen
 import br.com.letrariaapp.ui.features.auth.RegisterScreen
+import br.com.letrariaapp.ui.features.club.AdminScreen
+import br.com.letrariaapp.ui.features.club.AdminViewModel
 import br.com.letrariaapp.ui.features.club.ClubScreen
 import br.com.letrariaapp.ui.features.club.ClubViewModel
-import br.com.letrariaapp.ui.features.club.AdminScreen
+import br.com.letrariaapp.ui.features.club.DeleteClubResult
+import br.com.letrariaapp.ui.features.club.EditClubScreen
+import br.com.letrariaapp.ui.features.club.LeaveClubResult
 import br.com.letrariaapp.ui.features.createclub.CreateClubResult
 import br.com.letrariaapp.ui.features.createclub.CreateClubScreen
 import br.com.letrariaapp.ui.features.createclub.CreateClubViewModel
@@ -35,11 +39,10 @@ import br.com.letrariaapp.ui.features.search.JoinClubResult
 import br.com.letrariaapp.ui.features.search.SearchClubScreen
 import br.com.letrariaapp.ui.features.settings.SettingsScreen
 import br.com.letrariaapp.ui.features.settings.SettingsViewModel
+import br.com.letrariaapp.ui.features.settings.TermsAndPoliciesScreen
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
-
-
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,11 +62,7 @@ fun AppNavigation() {
     val authViewModel: AuthViewModel = viewModel()
 
     val currentUser = Firebase.auth.currentUser
-    val startDestination = if (currentUser != null && currentUser.isEmailVerified) {
-        "home"
-    } else {
-        "login"
-    }
+    val startDestination = if (currentUser != null && currentUser.isEmailVerified) "home" else "login"
 
     NavHost(navController = navController, startDestination = startDestination) {
 
@@ -100,7 +99,6 @@ fun AppNavigation() {
                 onSettingsClick = { navController.navigate("settings") },
                 onCreateClubClick = { navController.navigate("create_club") },
                 onJoinClubClick = { navController.navigate("search_club") },
-                // ✅ CONEXÃO FEITA AQUI
                 onClubClick = { club ->
                     navController.navigate("club/${club.id}")
                 }
@@ -190,7 +188,8 @@ fun AppNavigation() {
                         popUpTo(0)
                     }
                 },
-                onDeleteAccount = { settingsViewModel.deleteAccount() }
+                onDeleteAccount = { settingsViewModel.deleteAccount() },
+                onTermsClick = { navController.navigate("terms_and_policies") }
             )
         }
 
@@ -200,7 +199,7 @@ fun AppNavigation() {
             val context = LocalContext.current
 
             LaunchedEffect(result) {
-                when(val res = result) {
+                when (val res = result) {
                     is CreateClubResult.SUCCESS -> {
                         Toast.makeText(context, "Clube criado com sucesso!", Toast.LENGTH_SHORT).show()
                         viewModel.resetResult()
@@ -272,7 +271,6 @@ fun AppNavigation() {
                     onProfileClick = { userId ->
                         navController.navigate("profile/$userId")
                     },
-                    // ✅ Ação para o novo botão de admin
                     onAdminClick = {
                         navController.navigate("club_admin/$clubId")
                     }
@@ -280,18 +278,74 @@ fun AppNavigation() {
             }
         }
 
-        // ✅ NOVA ROTA PARA A TELA ADMIN
         composable(
             route = "club_admin/{clubId}",
             arguments = listOf(navArgument("clubId") { type = NavType.StringType })
         ) { backStackEntry ->
             val clubId = backStackEntry.arguments?.getString("clubId")
+            val adminViewModel: AdminViewModel = viewModel()
+            val context = LocalContext.current
+
+            val toastMessage by adminViewModel.toastMessage.observeAsState()
+            LaunchedEffect(toastMessage) {
+                toastMessage?.let { message ->
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    adminViewModel.onToastMessageShown()
+                }
+            }
+
+            val leaveResult by adminViewModel.leaveResult.observeAsState(LeaveClubResult.IDLE)
+            LaunchedEffect(leaveResult) {
+                if (leaveResult is LeaveClubResult.SUCCESS) {
+                    adminViewModel.resetLeaveResult()
+                    navController.navigate("home") {
+                        popUpTo(0)
+                    }
+                }
+            }
+
+            // ✅ LÓGICA DE EXCLUSÃO QUE FALTAVA
+            val deleteResult by adminViewModel.clubDeleted.observeAsState(DeleteClubResult.IDLE)
+            LaunchedEffect(deleteResult) {
+                if (deleteResult is DeleteClubResult.SUCCESS) {
+                    // Não precisa resetar, pois já estamos saindo
+                    navController.navigate("home") {
+                        popUpTo(0)
+                    }
+                }
+            }
+
             if (clubId != null) {
                 AdminScreen(
                     clubId = clubId,
-                    onBackClick = { navController.popBackStack() }
+                    viewModel = adminViewModel,
+                    onBackClick = { navController.popBackStack() },
+                    onLeaveClub = { adminViewModel.leaveClub() },
+                    onDrawUser = { adminViewModel.drawUserForCycle() },
+                    onEditClub = { navController.navigate("edit_club/$clubId") }
                 )
             }
         }
+
+        composable(
+            route = "edit_club/{clubId}",
+            arguments = listOf(navArgument("clubId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val clubId = backStackEntry.arguments?.getString("clubId")
+            if (clubId != null) {
+                EditClubScreen(
+                    clubId = clubId,
+                    onBackClick = { navController.popBackStack() },
+                    onSaveSuccess = { navController.popBackStack() }
+                )
+            }
+        }
+
+        composable("terms_and_policies") {
+            TermsAndPoliciesScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
     }
 }
