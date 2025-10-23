@@ -128,13 +128,36 @@ fun SettingsScreenContent(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
+                // ✅ --- BOTÕES RESTAURADOS ---
                 // Ações Finais
-                // ... (Botões de Sair e Excluir)
+                Button(
+                    onClick = onLogoutClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sair da conta", color = MaterialTheme.colorScheme.onSecondaryContainer)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = onDeleteAccountClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Excluir conta", color = MaterialTheme.colorScheme.onErrorContainer)
+                }
+                // ✅ --- FIM DA RESTAURAÇÃO ---
             }
         }
     }
 }
 
+// ... (Resto do arquivo: DeleteAccountDialog, InfoRow, ClickableRow, Preview, TermsAndPoliciesScreen - Sem Mudanças)
 @Composable
 fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
@@ -157,7 +180,6 @@ fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
-// --- COMPONENTES AUXILIARES ---
 @Composable
 private fun InfoRow(label: String, value: String) {
     Row(
@@ -195,7 +217,6 @@ private fun ClickableRow(label: String, value: String? = null, onClick: () -> Un
     HorizontalDivider()
 }
 
-// --- PREVIEW ---
 @Preview(showBackground = true)
 @Composable
 fun SettingsScreenPreview() {
@@ -210,7 +231,6 @@ fun SettingsScreenPreview() {
     }
 }
 
-// --- TELA DE TERMOS E POLÍTICAS ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TermsAndPoliciesScreen(
@@ -239,7 +259,6 @@ fun TermsAndPoliciesScreen(
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                // ✅ --- TEXTO MODELO ADICIONADO ---
                 Text(
                     "Termos de Uso",
                     style = MaterialTheme.typography.headlineSmall,
