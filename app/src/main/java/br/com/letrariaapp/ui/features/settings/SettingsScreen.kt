@@ -59,7 +59,7 @@ fun SettingsScreen(
         onFeedbackClick = {
             val intent = Intent(Intent.ACTION_SENDTO).apply {
                 data = Uri.parse("mailto:")
-                putExtra(Intent.EXTRA_EMAIL, arrayOf("feedback@letrariaapp.com"))
+                putExtra(Intent.EXTRA_EMAIL, arrayOf("letrariaapp@gmail.com"))
                 putExtra(Intent.EXTRA_SUBJECT, "Feedback sobre o LetrariaApp")
             }
             try { context.startActivity(intent) } catch (e: Exception) { /* Lida com erro */ }
