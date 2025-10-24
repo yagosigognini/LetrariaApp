@@ -230,7 +230,7 @@ fun LoginScreenContent(
                     }
                     // ✅ --- FIM DO BOTÃO ---
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(70.dp))
             }
         }
     }

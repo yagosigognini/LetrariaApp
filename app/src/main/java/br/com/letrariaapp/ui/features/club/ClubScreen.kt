@@ -328,7 +328,7 @@ fun ClubHeader(
             onClick = onBackClick,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(8.dp)
+                .padding(16.dp)
         ) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Color.White)
         }
@@ -338,7 +338,7 @@ fun ClubHeader(
             onClick = onAdminClick,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(8.dp)
+                .padding(16.dp)
         ) {
             Icon(Icons.Default.Settings, contentDescription = "Configurações do Clube", tint = Color.White)
         }

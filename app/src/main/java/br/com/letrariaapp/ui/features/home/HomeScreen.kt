@@ -285,7 +285,7 @@ fun ActionButtons(onCreateClubClick: () -> Unit, onJoinClubClick: () -> Unit) {
             onClick = onCreateClubClick,
             modifier = Modifier
                 .weight(1f)
-                .height(50.dp),
+                .height(65.dp),
             colors = ButtonDefaults.buttonColors(containerColor = homeButtonColor)
         ) {
             Text("CRIAR CLUBE", color = Color.White)
@@ -294,7 +294,7 @@ fun ActionButtons(onCreateClubClick: () -> Unit, onJoinClubClick: () -> Unit) {
             onClick = onJoinClubClick,
             modifier = Modifier
                 .weight(1f)
-                .height(50.dp),
+                .height(65.dp),
             colors = ButtonDefaults.buttonColors(containerColor = homeButtonColor)
         ) {
             Text("BUSCAR CLUBES", color = Color.White)
