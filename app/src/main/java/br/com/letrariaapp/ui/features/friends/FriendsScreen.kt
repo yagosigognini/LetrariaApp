@@ -38,20 +38,20 @@ import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import java.util.Date
+import androidx.compose.runtime.LaunchedEffect // ✅ NOVO IMPORT
 
 // --- TELA "INTELIGENTE" (STATEFUL) ---
 @Composable
 fun FriendsScreen(
     viewModel: FriendsViewModel = viewModel(),
+    startTabIndex: Int = 0, // ✅ NOVO PARÂMETRO: Aba inicial (padrão 0)
     onBackClick: () -> Unit,
     onSearchUserClick: () -> Unit, // Navega para a tela de busca de usuários
     onProfileClick: (String) -> Unit // Navega para o perfil de um amigo
 ) {
     val state by viewModel.state.collectAsState()
-    // ✅ Observa o novo estado para o diálogo de confirmação
     val friendToRemove by viewModel.friendToRemove.collectAsState()
 
-    // ✅ Mostra o diálogo de confirmação se friendToRemove não for nulo
     friendToRemove?.let { friend ->
         RemoveFriendDialog(
             friendName = friend.name,
@@ -62,13 +62,12 @@ fun FriendsScreen(
 
     FriendsScreenContent(
         state = state,
+        startTabIndex = startTabIndex, // ✅ PASSA O startTabIndex para a Content
         onBackClick = onBackClick,
         onSearchUserClick = onSearchUserClick,
         onProfileClick = onProfileClick,
         onAcceptRequest = { request -> viewModel.acceptFriendRequest(request) },
         onDeclineRequest = { request -> viewModel.declineFriendRequest(request) },
-        // ✅ ATUALIZADO: Chama 'requestRemoveFriend' (que mostra o diálogo)
-        // em vez de 'removeFriend' (que deleta direto)
         onRemoveFriendRequest = { friend -> viewModel.requestRemoveFriend(friend) },
         onCancelRequest = { request -> viewModel.cancelSentRequest(request) }
     )
@@ -79,17 +78,26 @@ fun FriendsScreen(
 @Composable
 fun FriendsScreenContent(
     state: FriendsScreenState,
+    startTabIndex: Int, // ✅ NOVO PARÂMETRO: Recebe a aba inicial
     onBackClick: () -> Unit,
     onSearchUserClick: () -> Unit,
     onProfileClick: (String) -> Unit,
     onAcceptRequest: (FriendRequest) -> Unit,
     onDeclineRequest: (FriendRequest) -> Unit,
-    onRemoveFriendRequest: (Friend) -> Unit, // ✅ ATUALIZADO: Nome do parâmetro
+    onRemoveFriendRequest: (Friend) -> Unit,
     onCancelRequest: (FriendRequest) -> Unit
 ) {
     val tabTitles = listOf("Amigos", "Pedidos Recebidos", "Pedidos Enviados")
-    val pagerState = rememberPagerState { tabTitles.size }
+    // ✅ USA O startTabIndex para definir a página inicial do Pager
+    val pagerState = rememberPagerState(initialPage = startTabIndex) { tabTitles.size }
     val coroutineScope = rememberCoroutineScope()
+
+    // ✅ EFEITO PARA PULAR PARA A ABA CORRETA (caso o startTabIndex mude)
+    LaunchedEffect(startTabIndex) {
+        if (startTabIndex >= 0 && startTabIndex < tabTitles.size && startTabIndex != pagerState.currentPage) {
+            pagerState.animateScrollToPage(startTabIndex)
+        }
+    }
 
     AppBackground(backgroundResId = R.drawable.background) {
         Scaffold(
@@ -157,7 +165,7 @@ fun FriendsScreenContent(
                                 0 -> FriendsList(
                                     friends = state.friends,
                                     onProfileClick = onProfileClick,
-                                    onRemoveRequestClick = onRemoveFriendRequest // ✅ ATUALIZADO
+                                    onRemoveRequestClick = onRemoveFriendRequest
                                 )
                                 1 -> ReceivedRequestsList(
                                     requests = state.receivedRequests,
@@ -184,7 +192,7 @@ fun FriendsScreenContent(
 fun FriendsList(
     friends: List<Friend>,
     onProfileClick: (String) -> Unit,
-    onRemoveRequestClick: (Friend) -> Unit // ✅ ATUALIZADO
+    onRemoveRequestClick: (Friend) -> Unit
 ) {
     if (friends.isEmpty()) {
         Text("Você ainda não tem amigos.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
@@ -194,7 +202,7 @@ fun FriendsList(
                 FriendItemRow(
                     friend = friend,
                     onProfileClick = { onProfileClick(friend.uid) },
-                    onRemoveRequestClick = { onRemoveRequestClick(friend) } // ✅ ATUALIZADO
+                    onRemoveRequestClick = { onRemoveRequestClick(friend) }
                 )
             }
         }
@@ -208,7 +216,6 @@ fun ReceivedRequestsList(
     onAcceptClick: (FriendRequest) -> Unit,
     onDeclineClick: (FriendRequest) -> Unit
 ) {
-    // ... (Sem mudanças aqui) ...
     if (requests.isEmpty()) {
         Text("Nenhum pedido de amizade recebido.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
     } else {
@@ -230,7 +237,6 @@ fun SentRequestsList(
     requests: List<FriendRequest>,
     onCancelClick: (FriendRequest) -> Unit
 ) {
-    // ... (Sem mudanças aqui) ...
     if (requests.isEmpty()) {
         Text("Nenhum pedido de amizade enviado.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
     } else {
@@ -251,7 +257,7 @@ fun SentRequestsList(
 fun FriendItemRow(
     friend: Friend,
     onProfileClick: () -> Unit,
-    onRemoveRequestClick: () -> Unit, // ✅ ATUALIZADO
+    onRemoveRequestClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -277,7 +283,6 @@ fun FriendItemRow(
             Spacer(modifier = Modifier.width(12.dp))
             Text(friend.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
             Spacer(modifier = Modifier.weight(1f))
-            // ✅ Botão de Remover agora chama o request
             IconButton(onClick = onRemoveRequestClick) {
                 Icon(Icons.Default.Close, contentDescription = "Remover Amigo", tint = MaterialTheme.colorScheme.error)
             }
@@ -287,7 +292,6 @@ fun FriendItemRow(
 
 @Composable
 fun FriendRequestItemRow(
-    // ... (Sem mudanças aqui) ...
     request: FriendRequest,
     onProfileClick: () -> Unit,
     onAcceptClick: () -> Unit,
@@ -329,7 +333,6 @@ fun FriendRequestItemRow(
 
 @Composable
 fun SentRequestItemRow(
-    // ... (Sem mudanças aqui) ...
     request: FriendRequest,
     onCancelClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -364,7 +367,7 @@ fun SentRequestItemRow(
     }
 }
 
-// ⬇️ --- NOVO DIÁLOGO DE CONFIRMAÇÃO --- ⬇️
+// --- Diálogo de Confirmação ---
 @Composable
 fun RemoveFriendDialog(
     friendName: String,
@@ -387,13 +390,11 @@ fun RemoveFriendDialog(
         }
     )
 }
-// ⬆️ --- FIM DO NOVO DIÁLOGO --- ⬆️
 
 // --- Preview ---
 @Preview(showBackground = true)
 @Composable
 fun FriendsScreenContentPreview() {
-    // ... (Dados de exemplo - sem mudanças) ...
     val sampleFriend = Friend(uid = "123", name = "Amigo Exemplo", profilePictureUrl = "", addedAt = Date())
     val sampleReceivedRequest = FriendRequest(senderId = "456", senderName = "Usuário Pedinte", receiverId = "123", receiverName = "Eu")
     val sampleSentRequest = FriendRequest(senderId = "123", senderName = "Eu", receiverId = "789", receiverName = "Pessoa Pendente")
@@ -402,12 +403,13 @@ fun FriendsScreenContentPreview() {
     LetrariaAppTheme {
         FriendsScreenContent(
             state = sampleState,
+            startTabIndex = 1, // ✅ ATUALIZAÇÃO NO PREVIEW para testar a 2ª aba
             onBackClick = {},
             onSearchUserClick = {},
             onProfileClick = {},
             onAcceptRequest = {},
             onDeclineRequest = {},
-            onRemoveFriendRequest = {}, // ✅ ATUALIZADO
+            onRemoveFriendRequest = {},
             onCancelRequest = {}
         )
     }

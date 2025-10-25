@@ -250,6 +250,7 @@ class ProfileViewModel : ViewModel() {
                 senderId = viewerUser.uid,
                 senderName = viewerUser.name,
                 senderPhotoUrl = viewerUser.profilePictureUrl,
+                receiverId = ownerUser.uid,
                 receiverName = ownerUser.name,
                 receiverPhotoUrl = ownerUser.profilePictureUrl
             )
@@ -436,10 +437,6 @@ class ProfileViewModel : ViewModel() {
         try {
             userRef.update(updates).await()
             _updateStatus.value = UpdateStatus.SUCCESS
-            // Não precisa chamar loadUserProfile aqui, o listener do documento (se houvesse) atualizaria
-            // Mas para garantir que a UI veja a mudança imediatamente após salvar (sem listener no doc user),
-            // podemos forçar uma releitura ou atualizar o LiveData localmente.
-            // A forma mais simples é recarregar, mas pode ser otimizado.
             loadUserProfile(uid) // Recarrega para mostrar dados atualizados
         } catch (e: Exception) {
             Log.e("ProfileViewModel", "Erro ao atualizar documento do usuário $uid", e)

@@ -27,8 +27,8 @@ android {
         applicationId = "br.com.letrariaapp"
         minSdk = 29
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 6
+        versionName = "1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -72,7 +72,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.material)
     implementation("androidx.core:core-splashscreen:1.0.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
     // --- Jetpack Compose ---
     implementation(platform(libs.androidx.compose.bom))

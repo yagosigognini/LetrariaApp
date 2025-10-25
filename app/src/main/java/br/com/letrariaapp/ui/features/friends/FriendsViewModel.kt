@@ -25,21 +25,16 @@ class FriendsViewModel : ViewModel() {
     private val auth = Firebase.auth
     private val currentUserId = auth.currentUser?.uid
 
-    // Listeners do Firestore para limpar no final
     private var receivedListener: ListenerRegistration? = null
     private var sentListener: ListenerRegistration? = null
     private var friendsListener: ListenerRegistration? = null
 
-    // StateFlow para gerenciar o estado da UI
     private val _state = MutableStateFlow(FriendsScreenState())
     val state: StateFlow<FriendsScreenState> = _state.asStateFlow()
 
-    // ⬇️ --- NOVO ESTADO PARA DIÁLOGO DE CONFIRMAÇÃO --- ⬇️
     private val _friendToRemove = MutableStateFlow<Friend?>(null)
     val friendToRemove: StateFlow<Friend?> = _friendToRemove.asStateFlow()
-    // ⬆️ --- FIM DO NOVO ESTADO --- ⬆️
 
-    // Bloco inicial: Carrega todos os dados
     init {
         loadAllFriendsData()
     }
@@ -49,19 +44,19 @@ class FriendsViewModel : ViewModel() {
             _state.update { it.copy(isLoading = false, errorMessage = "Usuário não autenticado.") }
             return
         }
-
         listenForReceivedRequests(currentUserId)
         listenForSentRequests(currentUserId)
         listenForFriends(currentUserId)
     }
 
-    // 1. Ouve pedidos recebidos
+    // ✅ ESTA É A FUNÇÃO QUE PROVAVELMENTE ESTÁ FALHANDO DEVIDO AO ÍNDICE
     private fun listenForReceivedRequests(myUserId: String) {
         receivedListener?.remove()
         receivedListener = db.collection("friend_requests")
-            .whereEqualTo("receiverId", myUserId)
+            .whereEqualTo("receiverId", myUserId) // ⬅️ ESTA LINHA REQUER UM ÍNDICE
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    // ❗️ PROCURE ESTE LOG NO SEU LOGCAT ❗️
                     Log.e("FriendsVM", "Erro ao ouvir pedidos recebidos", error)
                     _state.update { it.copy(errorMessage = "Erro ao carregar pedidos.") }
                     return@addSnapshotListener
@@ -71,11 +66,11 @@ class FriendsViewModel : ViewModel() {
             }
     }
 
-    // 2. Ouve pedidos enviados
+    // Esta função funciona (como você disse)
     private fun listenForSentRequests(myUserId: String) {
         sentListener?.remove()
         sentListener = db.collection("friend_requests")
-            .whereEqualTo("senderId", myUserId)
+            .whereEqualTo("senderId", myUserId) // Esta query funciona (índice automático)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e("FriendsVM", "Erro ao ouvir pedidos enviados", error)
@@ -86,7 +81,6 @@ class FriendsViewModel : ViewModel() {
             }
     }
 
-    // 3. Ouve amigos confirmados
     private fun listenForFriends(myUserId: String) {
         friendsListener?.remove()
         friendsListener = db.collection("users").document(myUserId).collection("friends")
@@ -102,13 +96,10 @@ class FriendsViewModel : ViewModel() {
     }
 
     // --- AÇÕES ---
-
-    /** Recusa um pedido de amizade (simplesmente deleta o pedido) */
     fun declineFriendRequest(request: FriendRequest) {
         if (currentUserId == null) return
         viewModelScope.launch {
             try {
-                // Encontra o documento do pedido e deleta
                 val requestDoc = db.collection("friend_requests")
                     .whereEqualTo("senderId", request.senderId)
                     .whereEqualTo("receiverId", request.receiverId)
@@ -116,7 +107,6 @@ class FriendsViewModel : ViewModel() {
 
                 if (!requestDoc.isEmpty) {
                     requestDoc.documents[0].reference.delete().await()
-                    Log.d("FriendsVM", "Pedido de ${request.senderName} recusado.")
                 }
             } catch (e: Exception) {
                 Log.e("FriendsVM", "Erro ao recusar pedido", e)
@@ -125,15 +115,12 @@ class FriendsViewModel : ViewModel() {
         }
     }
 
-    /** Aceita um pedido de amizade */
     fun acceptFriendRequest(request: FriendRequest) {
-        val myUserId = currentUserId
-        val senderId = request.senderId
+        val myUserId = currentUserId; val senderId = request.senderId
         if (myUserId == null) return
 
         viewModelScope.launch {
             try {
-                // 1. Precisamos dos dados do usuário atual (o receptor)
                 val myUserDoc = db.collection("users").document(myUserId).get().await()
                 val myUser = myUserDoc.toObject<User>()
                 if (myUser == null) {
@@ -141,31 +128,19 @@ class FriendsViewModel : ViewModel() {
                     return@launch
                 }
 
-                // 2. Prepara os objetos 'Friend' para ambos
-                val friendForMe = Friend(
-                    uid = request.senderId,
-                    name = request.senderName,
-                    profilePictureUrl = request.senderPhotoUrl
-                )
-                val friendForSender = Friend(
-                    uid = myUser.uid,
-                    name = myUser.name,
-                    profilePictureUrl = myUser.profilePictureUrl
-                )
+                val friendForMe = Friend(uid = request.senderId, name = request.senderName, profilePictureUrl = request.senderPhotoUrl)
+                val friendForSender = Friend(uid = myUser.uid, name = myUser.name, profilePictureUrl = myUser.profilePictureUrl)
 
-                // 3. Referências dos documentos no Firestore
                 val myFriendDocRef = db.collection("users").document(myUserId).collection("friends").document(senderId)
                 val senderFriendDocRef = db.collection("users").document(senderId).collection("friends").document(myUserId)
                 val myUserDocRef = db.collection("users").document(myUserId)
                 val senderUserDocRef = db.collection("users").document(senderId)
 
-                // 4. Referência do pedido a ser deletado
                 val requestDocRef = db.collection("friend_requests")
                     .whereEqualTo("senderId", senderId)
                     .whereEqualTo("receiverId", myUserId)
                     .limit(1).get().await().documents.first().reference
 
-                // 5. Executa tudo em uma transação
                 db.runTransaction { transaction ->
                     transaction.delete(requestDocRef)
                     transaction.set(myFriendDocRef, friendForMe)
@@ -174,9 +149,6 @@ class FriendsViewModel : ViewModel() {
                     transaction.update(senderUserDocRef, "friendCount", FieldValue.increment(1))
                     null
                 }.await()
-
-                Log.d("FriendsVM", "Amizade com ${request.senderName} aceita!")
-
             } catch (e: Exception) {
                 Log.e("FriendsVM", "Erro ao aceitar pedido", e)
                 _state.update { it.copy(errorMessage = "Erro ao aceitar pedido.") }
@@ -184,12 +156,10 @@ class FriendsViewModel : ViewModel() {
         }
     }
 
-    /** Cancela um pedido de amizade enviado */
     fun cancelSentRequest(request: FriendRequest) {
         if (currentUserId == null || currentUserId != request.senderId) return
         viewModelScope.launch {
             try {
-                // Encontra o documento do pedido e deleta
                 val requestDoc = db.collection("friend_requests")
                     .whereEqualTo("senderId", request.senderId)
                     .whereEqualTo("receiverId", request.receiverId)
@@ -197,7 +167,6 @@ class FriendsViewModel : ViewModel() {
 
                 if (!requestDoc.isEmpty) {
                     requestDoc.documents[0].reference.delete().await()
-                    Log.d("FriendsVM", "Pedido enviado para ${request.receiverName} cancelado.")
                 }
             } catch (e: Exception) {
                 Log.e("FriendsVM", "Erro ao cancelar pedido", e)
@@ -206,59 +175,37 @@ class FriendsViewModel : ViewModel() {
         }
     }
 
-    // ⬇️ --- NOVAS FUNÇÕES PARA CONFIRMAR REMOÇÃO --- ⬇️
-
-    /** Chamado pela UI (botão X) para iniciar a remoção */
-    fun requestRemoveFriend(friend: Friend) {
-        _friendToRemove.value = friend
-    }
-
-    /** Chamado pelo diálogo para cancelar a remoção */
-    fun cancelRemoveFriend() {
-        _friendToRemove.value = null
-    }
-    // ⬆️ --- FIM DAS NOVAS FUNÇÕES --- ⬆️
-
-    /** Remove um amigo (agora chamado pelo diálogo de confirmação) */
+    fun requestRemoveFriend(friend: Friend) { _friendToRemove.value = friend }
+    fun cancelRemoveFriend() { _friendToRemove.value = null }
     fun removeFriend(friend: Friend) {
-        val myUserId = currentUserId
-        val friendId = friend.uid
+        val myUserId = currentUserId; val friendId = friend.uid
         if (myUserId == null) return
 
         viewModelScope.launch {
             try {
-                // Usamos um Lote (Batch)
                 val batch = db.batch()
-
                 val myFriendDocRef = db.collection("users").document(myUserId).collection("friends").document(friendId)
                 val friendUserDocRef = db.collection("users").document(friendId).collection("friends").document(myUserId)
                 val myUserDocRef = db.collection("users").document(myUserId)
                 val friendUserDocRefMain = db.collection("users").document(friendId)
-
                 batch.delete(myFriendDocRef)
                 batch.delete(friendUserDocRef)
                 batch.update(myUserDocRef, "friendCount", FieldValue.increment(-1))
                 batch.update(friendUserDocRefMain, "friendCount", FieldValue.increment(-1))
-
                 batch.commit().await()
-                Log.d("FriendsVM", "Amizade com ${friend.name} removida.")
-
             } catch (e: Exception) {
                 Log.e("FriendsVM", "Erro ao remover amigo", e)
                 _state.update { it.copy(errorMessage = "Erro ao remover amigo.") }
             } finally {
-                // ✅ Limpa o estado de confirmação, quer tenha dado certo ou erro
                 _friendToRemove.value = null
             }
         }
     }
 
-    // Limpa todos os listeners quando o ViewModel é destruído
     override fun onCleared() {
         super.onCleared()
         receivedListener?.remove()
         sentListener?.remove()
         friendsListener?.remove()
-        Log.d("FriendsVM", "Listeners de amizade removidos.")
     }
 }

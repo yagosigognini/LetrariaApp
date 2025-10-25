@@ -50,16 +50,36 @@ import br.com.letrariaapp.ui.features.settings.TermsAndPoliciesScreen
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.os.Build
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import android.content.Intent
+import androidx.navigation.NavHostController
+import androidx.navigation.navDeepLink
 
 
 class MainActivity : ComponentActivity() {
+    private lateinit var navController: NavHostController
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         installSplashScreen()
         setContent {
             LetrariaAppTheme {
-                AppNavigation()
+                navController = rememberNavController()
+                AppNavigation(navController = navController)
             }
+        }
+    }
+
+    // ✅ CORREÇÃO 1: 'intent' agora é 'Intent' (não-nulo)
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (::navController.isInitialized) {
+            // ✅ CORREÇÃO 2: handleDeepLink aceita 'intent' (não-nulo)
+            navController.handleDeepLink(intent)
         }
     }
 }
@@ -68,16 +88,41 @@ class MainActivity : ComponentActivity() {
 const val BOOK_SEARCH_RESULT_KEY = "selected_book"
 
 @Composable
-fun AppNavigation() {
-    val navController = rememberNavController()
+fun AppNavigation(navController: NavHostController) { // ✅ CORREÇÃO 3: Recebe o NavController
+    // ❌ val navController = rememberNavController() // <- Esta linha foi removida
     val authViewModel: AuthViewModel = viewModel()
 
     val currentUser = Firebase.auth.currentUser
     val startDestination = if (currentUser != null && currentUser.isEmailVerified) "home" else "login"
 
+    // Este bloco cuida de pedir a permissão de notificação no Android 13+
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                Log.d("NotificationPermission", "Permissão CONCEDIDA")
+            } else {
+                Log.w("NotificationPermission", "Permissão NEGADA")
+            }
+        }
+    )
+
+    LaunchedEffect(key1 = true) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Checa se a permissão AINDA NÃO foi dada
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                // Pede a permissão
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
     NavHost(navController = navController, startDestination = startDestination) {
 
-        // ... (login, register, home - sem mudanças) ...
+        // --- Rota Login ---
         composable("login") {
             LoginScreen(
                 viewModel = authViewModel,
@@ -90,6 +135,7 @@ fun AppNavigation() {
             )
         }
 
+        // --- Rota Register ---
         composable("register") {
             RegisterScreen(
                 viewModel = authViewModel,
@@ -100,6 +146,7 @@ fun AppNavigation() {
             )
         }
 
+        // --- Rota Home ---
         composable("home") {
             HomeScreen(
                 onProfileClick = {
@@ -117,10 +164,13 @@ fun AppNavigation() {
             )
         }
 
-
+        // --- Rota Profile ---
         composable(
             route = "profile/{userId}",
-            arguments = listOf(navArgument("userId") { type = NavType.StringType; nullable = true })
+            arguments = listOf(navArgument("userId") { type = NavType.StringType; nullable = true }),
+            deepLinks = listOf(
+                navDeepLink { uriPattern = "letraria://profile/{userId}" }
+            )
         ) { backStackEntry ->
             val profileViewModel: ProfileViewModel = viewModel()
 
@@ -138,7 +188,6 @@ fun AppNavigation() {
             }
             // --- FIM CÓDIGO RECEBIMENTO (PROFILE) ---
 
-            // ✅ Esta é a chamada que precisa ser corrigida
             ProfileScreen(
                 viewModel = profileViewModel,
                 userId = backStackEntry.arguments?.getString("userId"),
@@ -147,7 +196,6 @@ fun AppNavigation() {
                 onBackClick = { navController.popBackStack() },
                 onEditProfileClick = { navController.navigate("edit_profile") },
 
-                // ✅ LINHA QUE FALTAVA (ou estava incorreta)
                 onLogoutClick = {
                     authViewModel.logout()
                     navController.navigate("login") { popUpTo(0) }
@@ -166,7 +214,7 @@ fun AppNavigation() {
             )
         }
 
-        // ... (edit_profile, settings, create_club, search_club - sem mudanças) ...
+        // --- Rota Edit Profile ---
         composable("edit_profile") {
             val profileViewModel: ProfileViewModel = viewModel(navController.previousBackStackEntry!!)
             val currentUserData by profileViewModel.user.observeAsState()
@@ -201,6 +249,7 @@ fun AppNavigation() {
             }
         }
 
+        // --- Rota Settings ---
         composable("settings") {
             val settingsViewModel: SettingsViewModel = viewModel()
             val toastMessage by settingsViewModel.toastMessage.observeAsState()
@@ -236,6 +285,7 @@ fun AppNavigation() {
             )
         }
 
+        // --- Rota Create Club ---
         composable("create_club") {
             val viewModel: CreateClubViewModel = viewModel()
             val result by viewModel.createClubResult.observeAsState()
@@ -262,6 +312,7 @@ fun AppNavigation() {
             )
         }
 
+        // --- Rota Search Club ---
         composable("search_club") {
             val searchViewModel: SearchClubViewModel = viewModel()
             val detailsViewModel: ClubDetailsViewModel = viewModel()
@@ -297,23 +348,30 @@ fun AppNavigation() {
             )
         }
 
-
+        // --- Rota Club ---
         composable(
             route = "club/{clubId}",
-            arguments = listOf(navArgument("clubId") { type = NavType.StringType })
+            arguments = listOf(navArgument("clubId") { type = NavType.StringType }),
+            deepLinks = listOf(
+                navDeepLink { uriPattern = "letraria://club/{clubId}" }
+            )
         ) { backStackEntry ->
             val clubId = backStackEntry.arguments?.getString("clubId")
                 ?: return@composable // Garante que clubId não seja nulo
 
-            // Usa a key para garantir um ViewModel por clube diferente
             val clubViewModel: ClubViewModel = viewModel(key = clubId)
 
             val toastMessage by clubViewModel.toastMessage.observeAsState()
             val context = LocalContext.current
 
-            LaunchedEffect(toastMessage) { /* ... (sem mudanças) ... */ }
+            LaunchedEffect(toastMessage) {
+                toastMessage?.let { message ->
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    clubViewModel.onToastMessageShown()
+                }
+            }
 
-            // ⬇️ --- CÓDIGO ATUALIZADO PARA RECEBER LIVRO (CLUB) --- ⬇️
+            // --- CÓDIGO PARA RECEBER LIVRO (CLUB) ---
             val bookResult = backStackEntry.savedStateHandle
                 .getLiveData<BookItem>(BOOK_SEARCH_RESULT_KEY)
                 .observeAsState()
@@ -321,16 +379,15 @@ fun AppNavigation() {
             LaunchedEffect(bookResult.value) {
                 bookResult.value?.let { bookItem ->
                     Log.d("ClubNav", "Recebido o livro para indicar: ${bookItem.volumeInfo?.title}")
-                    // Chama a função correta no ClubViewModel
                     clubViewModel.onBookSelectedFromSearch(bookItem) // ⬅️ CHAMADA AQUI
                     backStackEntry.savedStateHandle.remove<BookItem>(BOOK_SEARCH_RESULT_KEY)
                 }
             }
-            // ⬆️ --- FIM CÓDIGO RECEBIMENTO (CLUB) --- ⬆️
+            // --- FIM CÓDIGO RECEBIMENTO (CLUB) ---
 
             ClubScreen(
-                clubId = clubId, // Passa o ID para a tela
-                viewModel = clubViewModel, // Passa o ViewModel
+                clubId = clubId,
+                viewModel = clubViewModel,
                 onBackClick = { navController.popBackStack() },
                 onProfileClick = { userId ->
                     navController.navigate("profile/$userId")
@@ -338,17 +395,19 @@ fun AppNavigation() {
                 onAdminClick = {
                     navController.navigate("club_admin/$clubId")
                 },
-                // ⬇️ PASSA O LAMBDA PARA NAVEGAR PARA BUSCA ⬇️
                 onSearchBookClick = {
                     navController.navigate("book_search")
                 }
             )
         }
 
-        // ... (club_admin, edit_club, terms_and_policies - sem mudanças) ...
+        // --- Rota Club Admin ---
         composable(
             route = "club_admin/{clubId}",
-            arguments = listOf(navArgument("clubId") { type = NavType.StringType })
+            arguments = listOf(navArgument("clubId") { type = NavType.StringType }),
+            deepLinks = listOf(
+                navDeepLink { uriPattern = "letraria://club_admin/{clubId}" }
+            )
         ) { backStackEntry ->
             val clubId = backStackEntry.arguments?.getString("clubId")
             val adminViewModel: AdminViewModel = viewModel()
@@ -394,6 +453,7 @@ fun AppNavigation() {
             }
         }
 
+        // --- Rota Edit Club ---
         composable(
             route = "edit_club/{clubId}",
             arguments = listOf(navArgument("clubId") { type = NavType.StringType })
@@ -410,6 +470,7 @@ fun AppNavigation() {
             }
         }
 
+        // --- Rota Terms and Policies ---
         composable("terms_and_policies") {
             TermsAndPoliciesScreen(
                 onBackClick = { navController.popBackStack() }
@@ -417,39 +478,52 @@ fun AppNavigation() {
         }
 
 
-        // ⬇️ --- ROTA "book_search" CORRIGIDA --- ⬇️
+        // --- Rota Book Search ---
         composable("book_search") {
             BookSearchScreen(
-                onBookSelected = { selectedBook -> // selectedBook aqui é um BookItem
-                    // 1. Envia o BookItem Parcelable para a tela ANTERIOR
+                onBookSelected = { selectedBook ->
                     navController.previousBackStackEntry
                         ?.savedStateHandle
-                        ?.set(BOOK_SEARCH_RESULT_KEY, selectedBook) // selectedBook é um BookItem
+                        ?.set(BOOK_SEARCH_RESULT_KEY, selectedBook)
 
-                    // 2. Loga (Este log agora está correto)
                     Log.d("BookSearch", "Livro selecionado: ${selectedBook.volumeInfo?.title}")
 
-                    // 3. Volta para a tela que chamou (Profile ou Club)
                     navController.popBackStack()
                 },
-                onBackClick = { navController.popBackStack() } // Ação de cancelar
+                onBackClick = { navController.popBackStack() }
             )
         }
 
+        // --- Rota Search User ---
         composable("search_user") {
             SearchUserScreen(
-                // O ViewModel é obtido automaticamente pelo compose-lifecycle
                 onUserClick = { userId ->
-                    // Navega para o perfil do usuário clicado
                     navController.navigate("profile/$userId")
                 },
-                onBackClick = { navController.popBackStack() } // Volta para a tela anterior (Profile)
+                onBackClick = { navController.popBackStack() }
             )
         }
 
-        composable("friends") {
+        // --- Rota Friends ---
+        composable(
+            route = "friends?tab={tabIndex}", // Rota modificada
+            arguments = listOf( // Argumento adicionado
+                navArgument("tabIndex") {
+                    defaultValue = "0" // Aba "Amigos" é o padrão
+                    type = NavType.StringType
+                }
+            ),
+            deepLinks = listOf( // Deep Link adicionado
+                navDeepLink { uriPattern = "letraria://friends?tab={tabIndex}" }
+            )
+        ) { backStackEntry ->
             FriendsScreen(
                 viewModel = viewModel(),
+                // ✅ CORREÇÃO 4: O erro 'startTabIndex' está aqui.
+                // Esta chamada para FriendsScreen precisa ser atualizada.
+                // Vamos consertar isso no PRÓXIMO passo, quando você me mandar
+                // o arquivo FriendsScreen.kt.
+                startTabIndex = backStackEntry.arguments?.getString("tabIndex")?.toIntOrNull() ?: 0,
                 onBackClick = { navController.popBackStack() },
                 onSearchUserClick = {
                     navController.navigate("search_user")

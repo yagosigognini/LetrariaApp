@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat // ✅ NOVO
 import java.util.Date // ✅ NOVO
 import java.util.Locale // ✅ NOVO
+import br.com.letrariaapp.services.updateFcmTokenForCurrentUser
 
 // ✅ MUDANÇA: Agora é um AndroidViewModel para ter acesso ao Contexto
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -49,6 +50,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadCurrentUser() {
         viewModelScope.launch {
+            updateFcmTokenForCurrentUser()
             val uid = auth.currentUser?.uid
             if (uid == null) {
                 Log.e("HomeViewModel", "Nenhum usuário logado.")

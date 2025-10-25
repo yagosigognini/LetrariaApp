@@ -5,16 +5,15 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-// ✅ --- IMPORTS ADICIONADOS ---
 import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.GoogleAuthProvider
-// ---
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.Locale
+import br.com.letrariaapp.services.updateFcmTokenForCurrentUser
 
 sealed class AuthResult {
     data object IDLE : AuthResult()
@@ -43,6 +42,7 @@ class AuthViewModel : ViewModel() {
                 val result = auth.signInWithEmailAndPassword(email, password).await()
                 val user = result.user
                 if (user != null && user.isEmailVerified) {
+                    updateFcmTokenForCurrentUser()
                     _authResult.value = AuthResult.SUCCESS
                     onLoginSuccess()
                 } else {
@@ -135,6 +135,7 @@ class AuthViewModel : ViewModel() {
                 }
 
                 // Se for um usuário existente, ele só faz o login
+                updateFcmTokenForCurrentUser()
                 _authResult.value = AuthResult.SUCCESS
                 onLoginSuccess()
 
