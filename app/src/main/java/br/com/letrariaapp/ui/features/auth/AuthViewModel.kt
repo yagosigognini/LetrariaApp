@@ -14,6 +14,7 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Locale
 
 sealed class AuthResult {
     data object IDLE : AuthResult()
@@ -99,12 +100,15 @@ class AuthViewModel : ViewModel() {
         val user = hashMapOf(
             "uid" to uid,
             "name" to name,
+            "name_lowercase" to name.lowercase(Locale.ROOT), // ⬅️ ADICIONE ESTA LINHA
             "email" to email,
             "profilePictureUrl" to avatarUrl,
             "aboutMe" to "",
-            "friendCount" to 0L,
+            "friendCount" to 0L, // Seu User.kt espera Long, o que é ótimo
             "checklist" to emptyList<Any>(),
-            "clubs" to emptyList<Any>()
+            "clubs" to emptyList<Any>(),
+            // ✅ Adicione o campo coverPhotoUrl vazio por padrão
+            "coverPhotoUrl" to "" // ⬅️ ADICIONE ESTA LINHA
         )
         // Usamos .set(user, SetOptions.merge()) para não sobrescrever dados
         // caso o usuário já exista (o que não deve acontecer com a lógica de new user)

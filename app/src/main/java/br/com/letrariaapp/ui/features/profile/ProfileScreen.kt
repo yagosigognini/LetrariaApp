@@ -1,896 +1,635 @@
 package br.com.letrariaapp.ui.features.profile
 
-
-
 // --- Imports Essenciais ---
-
-import android.util.Log // Import do Log
-
 import android.widget.Toast
-
-import androidx.compose.foundation.ExperimentalFoundationApi // ⭐️ Import para Long Press
-
-import androidx.compose.foundation.background
-
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-
-import androidx.compose.foundation.combinedClickable // ⭐️ Import para Long Press
-
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
-
 import androidx.compose.foundation.lazy.LazyColumn
-
 import androidx.compose.foundation.lazy.LazyRow
-
 import androidx.compose.foundation.lazy.items
-
 import androidx.compose.foundation.shape.CircleShape
-
-import androidx.compose.foundation.shape.RoundedCornerShape
-
 import androidx.compose.material.icons.Icons
-
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-
+import androidx.compose.material.icons.automirrored.filled.Send // Ícone para Pedido Enviado
 import androidx.compose.material.icons.filled.Add
-
+import androidx.compose.material.icons.filled.Check // Ícone para Amigos
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-
 import androidx.compose.material.icons.filled.Star
-
 import androidx.compose.material3.*
-
 import androidx.compose.runtime.*
-
 import androidx.compose.runtime.livedata.observeAsState
-
 import androidx.compose.ui.Alignment
-
 import androidx.compose.ui.Modifier
-
 import androidx.compose.ui.draw.clip
-
 import androidx.compose.ui.graphics.Color
-
 import androidx.compose.ui.layout.ContentScale
-
 import androidx.compose.ui.platform.LocalContext
-
 import androidx.compose.ui.res.painterResource
-
 import androidx.compose.ui.text.font.FontWeight
-
 import androidx.compose.ui.text.style.TextAlign
-
 import androidx.compose.ui.text.style.TextOverflow
-
 import androidx.compose.ui.tooling.preview.Preview
-
 import androidx.compose.ui.unit.dp
-
 import androidx.compose.ui.unit.sp
-
 import androidx.lifecycle.viewmodel.compose.viewModel
-
 import br.com.letrariaapp.R
-
 import br.com.letrariaapp.data.BookClub
-
-import br.com.letrariaapp.data.ProfileRatedBook // Modelo correto para livros avaliados
-
+import br.com.letrariaapp.data.ProfileRatedBook
 import br.com.letrariaapp.data.User
-
 import br.com.letrariaapp.data.sampleClubsList
-
-import br.com.letrariaapp.data.sampleRatedBooks // Para Preview
-
+import br.com.letrariaapp.data.sampleRatedBooks
 import br.com.letrariaapp.data.sampleUser
-
 import br.com.letrariaapp.ui.components.AppBackground
-
 import br.com.letrariaapp.ui.components.ClubsSection
-
-import br.com.letrariaapp.ui.features.home.homeButtonColor // Cor do botão
-
+import br.com.letrariaapp.ui.features.home.homeButtonColor
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
-
 import coil.compose.AsyncImage
-
-import java.util.Locale // Para formatar nota
-
-
+import java.util.Locale
+import androidx.compose.runtime.collectAsState
 
 // --- TELA "INTELIGENTE" (STATEFUL) ---
-
 @Composable
-
 fun ProfileScreen(
-
     viewModel: ProfileViewModel = viewModel(),
-
-    userId: String?, // ID do perfil sendo visualizado (pode ser null se for o próprio)
-
+    userId: String?,
     onBackClick: () -> Unit,
-
     onEditProfileClick: () -> Unit,
-
-    onLogoutClick: () -> Unit, // Mantido caso Settings precise
-
     onSettingsClick: () -> Unit,
-
     onClubClick: (BookClub) -> Unit,
-
-    onAddBookClick: () -> Unit // Navega para BookSearch
-
+    onAddBookClick: () -> Unit,
+    onLogoutClick: () -> Unit,
+    onFriendsListClick: () -> Unit,
 ) {
-
-    LaunchedEffect(key1 = userId) {
-
-        viewModel.loadUserProfile(userId) // Carrega o perfil correto
-
-    }
-
-
+    LaunchedEffect(key1 = userId) { viewModel.loadUserProfile(userId) }
 
     // Observa os estados do ViewModel
-
     val user by viewModel.user.observeAsState()
-
-    val isOwnProfile by viewModel.isOwnProfile.observeAsState(false) // Define se é o perfil do usuário logado
-
+    val isOwnProfile by viewModel.isOwnProfile.observeAsState(false)
     val clubs by viewModel.clubs.observeAsState(emptyList())
+    val bookToRate by viewModel.bookToRate
+    val ratedBooks by viewModel.ratedBooks.observeAsState(emptyList())
+    val bookToDelete by viewModel.bookToDelete
+    val toastMessage by viewModel.toastMessage.observeAsState()
 
-    val bookToRate by viewModel.bookToRate // Livro pendente de avaliação
+    // ✅ Observa o novo estado de amizade
+    val friendshipStatus by viewModel.friendshipStatus.observeAsState(FriendshipStatus.LOADING)
 
-    val ratedBooks by viewModel.ratedBooks.observeAsState(emptyList()) // Lista de livros avaliados
+    val friendToRemove by viewModel.friendToRemove
 
-    val bookToDelete by viewModel.bookToDelete // Livro pendente de exclusão
+    val context = LocalContext.current
 
-
-
-    // Mostra diálogo de avaliação se houver livro pendente
-
-    bookToRate?.let { book ->
-
-        RatingDialog(
-
-            bookTitle = book.volumeInfo?.title,
-
-            onDismiss = { viewModel.onRatingDialogDismiss() },
-
-            onSubmit = { rating -> viewModel.onRatingSubmitted(rating) }
-
-        )
-
-    }
-
-
-
-    // ⭐️ Mostra diálogo de confirmação de exclusão se houver livro pendente
-
-    bookToDelete?.let { book ->
-
-        DeleteConfirmationDialog(
-
-            bookTitle = book.title,
-
-            onDismiss = { viewModel.cancelDeleteBook() },
-
-            onConfirm = { viewModel.confirmDeleteBook() }
-
-        )
-
-    }
-
-
-
-    // Tela de carregamento enquanto o usuário não foi carregado
-
-    if (user == null) {
-
-        AppBackground(backgroundResId = R.drawable.background) {
-
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-
-                CircularProgressIndicator()
-
-            }
-
+    // Efeito para exibir mensagens Toast
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.onToastMessageShown()
         }
-
-    } else {
-
-        // Passa todos os estados e callbacks necessários para a tela "burra"
-
-        ProfileScreenContent(
-
-            user = user!!,
-
-            isOwnProfile = isOwnProfile,
-
-            clubs = clubs,
-
-            ratedBooks = ratedBooks,
-
-            onBackClick = onBackClick,
-
-            onEditProfileClick = onEditProfileClick,
-
-            onLogoutClick = onLogoutClick, // Passado adiante
-
-            onSettingsClick = onSettingsClick,
-
-            onClubClick = onClubClick,
-
-            onAddBookClick = onAddBookClick,
-
-            onDeleteBookClick = { book -> // ⭐️ Passa a ação de pedir exclusão
-
-                viewModel.requestDeleteBook(book)
-
-            }
-
-        )
-
     }
 
-}
+    // Diálogo de Avaliação
+    if (bookToRate != null) { // ✅ MUDE DE ".let" PARA "if"
+        RatingDialog(
+            bookTitle = bookToRate?.volumeInfo?.title, // ✅ USE "bookToRate"
+            onDismiss = { viewModel.onRatingDialogDismiss() },
+            onSubmit = { rating -> viewModel.onRatingSubmitted(rating) }
+        )
+    }
 
+    // Diálogo de Exclusão
+    if (bookToDelete != null) { // ✅ MUDE DE ".let" PARA "if"
+        DeleteConfirmationDialog(
+            title = "Remover Livro",
+            text = "Tem certeza que deseja remover \"${bookToDelete?.title ?: "este livro"}\" da sua estante?", // ✅ USE "bookToDelete"
+            onDismiss = { viewModel.cancelDeleteBook() },
+            onConfirm = { viewModel.confirmDeleteBook() }
+        )
+    }
+
+    // ✅ NOVO: Diálogo de Exclusão (para AMIGOS)
+    if (friendToRemove != null) { // ✅ MUDE DE ".let" PARA "if"
+        DeleteConfirmationDialog(
+            title = "Remover Amigo",
+            text = "Tem certeza que deseja remover \"${friendToRemove?.name}\" da sua lista de amigos?", // ✅ USE "friendToRemove"
+            onDismiss = { viewModel.cancelRemoveFriend() },
+            onConfirm = { viewModel.confirmRemoveFriend() }
+        )
+    }
+
+    // Conteúdo principal
+    if (user == null) {
+        // Tela de Carregamento
+        AppBackground(backgroundResId = R.drawable.background) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+    } else {
+        // Tela de Conteúdo (Stateless)
+        ProfileScreenContent(
+            user = user!!,
+            isOwnProfile = isOwnProfile,
+            friendshipStatus = friendshipStatus, // ✅ Passa o estado
+            clubs = clubs,
+            ratedBooks = ratedBooks,
+            onBackClick = onBackClick,
+            onEditProfileClick = onEditProfileClick,
+            onSettingsClick = onSettingsClick,
+            onClubClick = onClubClick,
+            onAddBookClick = onAddBookClick,
+            onDeleteBookClick = { book -> viewModel.requestDeleteBook(book) },
+            onSendFriendRequest = { viewModel.sendFriendRequest() },
+            onFriendsListClick = onFriendsListClick,
+            onRemoveFriendRequest = { viewModel.requestRemoveFriend() },
+        )
+    }
+}
 
 
 // --- TELA "BURRA" (STATELESS) ---
-
 @OptIn(ExperimentalMaterial3Api::class)
-
 @Composable
-
 fun ProfileScreenContent(
-
     user: User,
-
     isOwnProfile: Boolean,
-
+    friendshipStatus: FriendshipStatus,
     clubs: List<BookClub>,
-
     ratedBooks: List<ProfileRatedBook>,
-
     onBackClick: () -> Unit,
-
     onEditProfileClick: () -> Unit,
-
-    onLogoutClick: () -> Unit, // Recebe o callback
-
     onSettingsClick: () -> Unit,
-
     onClubClick: (BookClub) -> Unit,
-
     onAddBookClick: () -> Unit,
-
-    onDeleteBookClick: (ProfileRatedBook) -> Unit // ⭐️ Recebe o callback de exclusão
-
+    onDeleteBookClick: (ProfileRatedBook) -> Unit,
+    onSendFriendRequest: () -> Unit,
+    onFriendsListClick: () -> Unit,
+    onRemoveFriendRequest: () -> Unit,
 ) {
-
     AppBackground(backgroundResId = R.drawable.background) {
-
         Scaffold(
-
-            containerColor = Color.Transparent, // Fundo transparente para ver o AppBackground
-
+            containerColor = Color.Transparent, // Fundo transparente
             topBar = {
-
                 TopAppBar(
-
-                    title = { }, // Sem título na barra
-
-                    navigationIcon = { // Botão de voltar
-
-                        IconButton(onClick = onBackClick) {
-
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-
-                        }
-
+                    title = {
+                        Text(
+                            text = if (isOwnProfile) "Meu Perfil" else user.name,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
                     },
-
-                    actions = { // Botões à direita
-
-                        // Mostra botão de Configurações APENAS no perfil próprio
-
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar", tint = MaterialTheme.colorScheme.onBackground)
+                        }
+                    },
+                    actions = {
                         if (isOwnProfile) {
+                            IconButton(onClick = onEditProfileClick) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Editar Perfil",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
 
                             IconButton(onClick = onSettingsClick) {
-
-                                Icon(Icons.Default.Settings, contentDescription = "Configurações")
-
+                                Icon(Icons.Default.Settings, "Configurações", tint = MaterialTheme.colorScheme.onBackground)
                             }
 
                         }
-
                     },
-
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent), // Barra transparente
-
-                    windowInsets = WindowInsets.statusBars // Ajusta padding da status bar
-
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent
+                    ),
+                    windowInsets = WindowInsets.statusBars
                 )
-
             }
-
         ) { paddingValues ->
-
-            // Conteúdo principal rolável
-
+            // Conteúdo rolável
             LazyColumn(
-
                 modifier = Modifier
-
                     .fillMaxSize()
-
-                    .padding(paddingValues), // Aplica padding da Scaffold
-
+                    .padding(paddingValues), // Usa o padding completo do Scaffold (topo e baixo)
                 horizontalAlignment = Alignment.CenterHorizontally
-
             ) {
-
-                // Seção do cabeçalho (foto, nome, botões)
-
+                // Item 1: O Cabeçalho
                 item {
-
                     ProfileHeader(
-
                         user = user,
-
                         isOwnProfile = isOwnProfile,
-
-                        onEditProfileClick = onEditProfileClick
-
+                        friendshipStatus = friendshipStatus,
+                        onEditProfileClick = onEditProfileClick,
+                        onSendFriendRequest = onSendFriendRequest,
+                        onFriendsListClick = onFriendsListClick,
+                        onRemoveFriendRequest = onRemoveFriendRequest,
                     )
-
                 }
-
-                // Seção da estante (checklist)
-
+                // Item 2: A Estante
                 item {
-
                     ChecklistSection(
-
                         ratedBooks = ratedBooks,
-
                         onAddBookClick = onAddBookClick,
-
-                        isOwnProfile = isOwnProfile, // Passa se é o perfil próprio
-
-                        onDeleteBookClick = onDeleteBookClick // ⭐️ Passa o callback de exclusão
-
+                        isOwnProfile = isOwnProfile,
+                        onDeleteBookClick = onDeleteBookClick
                     )
-
                 }
-
-                // Seção dos clubes
-
+                // Item 3: Os Clubes
                 item {
-
                     ClubsSection(
-
                         title = "Clubes",
-
                         clubs = clubs,
-
                         onClubClick = onClubClick
-
                     )
-
                 }
-
+                item { Spacer(modifier = Modifier.height(80.dp)) } // Espaço no final
             }
-
         }
-
     }
-
 }
-
-
 
 // --- COMPONENTES DA TELA ---
 
-
-
 @Composable
-
 fun ProfileHeader(
-
     user: User,
-
     isOwnProfile: Boolean,
-
-    onEditProfileClick: () -> Unit
-
+    friendshipStatus: FriendshipStatus,
+    onEditProfileClick: () -> Unit,
+    onSendFriendRequest: () -> Unit,
+    onFriendsListClick: () -> Unit,
+    onRemoveFriendRequest: () -> Unit,
 ) {
-
-    Column( /* ... (Sem mudanças aqui, código anterior estava ok) ... */ ) {
-
+    // Coluna principal centralizada
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, start = 16.dp, end = 16.dp) // Padding normal
+    ) {
+        // Foto de Perfil
         AsyncImage(
-
             model = user.profilePictureUrl.ifEmpty { R.drawable.ic_launcher_background },
-
             contentDescription = "Foto de Perfil",
-
             modifier = Modifier
-
                 .size(120.dp)
-
-                .clip(CircleShape),
-
+                .clip(CircleShape)
+                .border(3.dp, MaterialTheme.colorScheme.surface, CircleShape),
             contentScale = ContentScale.Crop,
-
             placeholder = painterResource(id = R.drawable.ic_launcher_background),
-
             error = painterResource(id = R.drawable.ic_launcher_background)
-
         )
-
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text(
-
-            text = user.name,
-
-            style = MaterialTheme.typography.headlineSmall,
-
-            fontWeight = FontWeight.Bold
-
-        )
-
+        // Nome
+        Text(text = user.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (isOwnProfile) {
-
-            Button(onClick = onEditProfileClick, colors = ButtonDefaults.buttonColors(containerColor = homeButtonColor)) {
-
-                Text("Editar Perfil")
-
-            }
-
-        } else {
-
-            Button(onClick = { /* TODO: Adicionar amigo */ }, enabled = false, colors = ButtonDefaults.buttonColors(containerColor = homeButtonColor)) {
-
-                Text("Adicionar amigo")
-
-            }
-
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
+        // Sobre Mim
         if (user.aboutMe.isNotEmpty()) {
-
             Text(
-
                 text = user.aboutMe,
-
                 style = MaterialTheme.typography.bodyMedium,
-
                 textAlign = TextAlign.Center,
-
                 modifier = Modifier.padding(horizontal = 16.dp)
-
             )
-
+            Spacer(modifier = Modifier.height(16.dp))
+        } else {
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        // Row para Contador de Amigos e Botão
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.height(IntrinsicSize.Min) // Evita "pulos"
+        ) {
+            if (isOwnProfile) {
+                // SE FOR O PERFIL PRÓPRIO:
+                // Contador clicável
+                Row(
+                    modifier = Modifier.clickable(onClick = onFriendsListClick), // ⬅️ AÇÃO DE CLIQUE AQUI
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = "Amigos",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "${user.friendCount} amigos",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
+
+            } else {
+                // SE FOR PERFIL DE OUTRA PESSOA:
+                // Contador não clicável
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = "Amigos",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "${user.friendCount} amigos",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.width(16.dp)) // Espaço entre contador e botão
+
+                // Botão de Status de Amizade
+                when (friendshipStatus) {
+                    FriendshipStatus.LOADING -> {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    }
+                    FriendshipStatus.NOT_FRIENDS -> {
+                        TextButton(
+                            onClick = onSendFriendRequest,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, Modifier.size(18.dp))
+                            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                            Text("Adicionar Amigo", fontSize = 13.sp)
+                        }
+                    }
+                    FriendshipStatus.REQUEST_SENT -> {
+                        TextButton(
+                            onClick = { /* TODO: Cancelar pedido? */ },
+                            enabled = false,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, Modifier.size(18.dp))
+                            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                            Text("Pedido Enviado", fontSize = 13.sp)
+                        }
+                    }
+                    FriendshipStatus.REQUEST_RECEIVED -> {
+                        Button(
+                            onClick = onFriendsListClick, // ✅ CORREÇÃO: Deve levar para a lista de amigos
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Responder Pedido", fontSize = 13.sp)
+                        }
+                    }
+                    FriendshipStatus.FRIENDS -> {
+                        OutlinedButton(
+                            onClick = onRemoveFriendRequest, // ✅ LÓGICA DO PONTO 1 (correta)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp))
+                            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                            Text("Amigos", fontSize = 13.sp)
+                        }
+                    }
+                    FriendshipStatus.SELF -> {
+                        // Não acontece (coberto por isOwnProfile), mas necessário para o 'when'
+                    }
+                }
+            }
+        } // Fim da Row
+
+        Spacer(modifier = Modifier.height(24.dp)) // Espaço final
     }
-
 }
-
-
 
 // Seção da Estante (Checklist)
-
 @Composable
-
 fun ChecklistSection(
-
     ratedBooks: List<ProfileRatedBook>,
-
     onAddBookClick: () -> Unit,
-
-    isOwnProfile: Boolean, // ⭐️ Recebe o parâmetro
-
-    onDeleteBookClick: (ProfileRatedBook) -> Unit // ⭐️ Recebe o callback de exclusão
-
+    isOwnProfile: Boolean,
+    onDeleteBookClick: (ProfileRatedBook) -> Unit
 ) {
-
     Column(
-
         modifier = Modifier
-
             .fillMaxWidth()
-
-            .padding(top = 16.dp) // Espaçamento acima da seção
-
+            .padding(top = 16.dp)
     ) {
-
-        // Cabeçalho: Título "Minha Estante" e botão "Adicionar livro" (condicional)
-
         Row(
-
             modifier = Modifier
-
                 .fillMaxWidth()
-
-                .padding(horizontal = 16.dp), // Padding nas laterais do cabeçalho
-
+                .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-
             verticalAlignment = Alignment.CenterVertically
-
         ) {
-
             Text(
-
                 text = "Minha Estante",
-
                 style = MaterialTheme.typography.titleLarge,
-
                 fontWeight = FontWeight.Bold
-
             )
-
-            // ⭐️ Mostra o botão APENAS se isOwnProfile for true
-
             if (isOwnProfile) {
-
                 Button(
-
                     onClick = onAddBookClick,
-
-                    colors = ButtonDefaults.buttonColors(containerColor = homeButtonColor) // Aplicando a cor
-
+                    colors = ButtonDefaults.buttonColors(containerColor = homeButtonColor)
                 ) {
-
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
-
                     Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-
                     Text("Adicionar livro")
-
                 }
-
             }
-
         }
-
         Spacer(modifier = Modifier.height(16.dp))
 
-
-
-        // Conteúdo: Mensagem de estante vazia OU lista horizontal de livros
-
         if (ratedBooks.isEmpty()) {
-
-            Text( // Mensagem se não houver livros
-
-                text = "Sua estante está vazia. Adicione livros que você já leu!",
-
-                style = MaterialTheme.typography.bodyMedium,
-
-                modifier = Modifier
-
-                    .fillMaxWidth()
-
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-
-                textAlign = TextAlign.Center
-
-            )
-
-        } else {
-
-            // Lista horizontal rolável para os livros
-
-            LazyRow(
-
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), // Padding nas laterais da lista
-
-                horizontalArrangement = Arrangement.spacedBy(12.dp) // Espaço entre os cards de livro
-
-            ) {
-
-                items(ratedBooks) { book ->
-
-                    // Chama o Composable para cada item da lista
-
-                    RatedBookItem(
-
-                        book = book,
-
-                        // ⭐️ Passa o lambda para deletar ESTE livro específico
-
-                        onDeleteClick = { onDeleteBookClick(book) }
-
-                    )
-
-                }
-
-            }
-
-        }
-
-        Spacer(modifier = Modifier.height(24.dp)) // Espaço abaixo da seção
-
-    }
-
-}
-
-
-
-// Item individual da lista de livros avaliados
-
-@OptIn(ExperimentalFoundationApi::class) // ⭐️ Habilita APIs experimentais (combinedClickable)
-
-@Composable
-
-fun RatedBookItem(
-
-    book: ProfileRatedBook,
-
-    onDeleteClick: () -> Unit, // ⭐️ Recebe o lambda para deletar
-
-    modifier: Modifier = Modifier
-
-) {
-
-    Card(
-
-        modifier = modifier
-
-            .width(110.dp) // Largura fixa
-
-            // ⭐️ combinedClickable detecta clique simples e clique longo
-
-            .combinedClickable(
-
-                onClick = { /* TODO: Ação de clique simples (ex: ver detalhes?) */ },
-
-                onLongClick = onDeleteClick // Chama o lambda de deleção no clique longo
-
-            ),
-
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-
-    ) {
-
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-
-            // Imagem da capa
-
-            AsyncImage(
-
-                model = book.coverUrl?.ifEmpty { null }, // Usa null se a URL for vazia
-
-                contentDescription = book.title ?: "Capa do livro",
-
-                modifier = Modifier
-
-                    .height(150.dp)
-
-                    .fillMaxWidth() ,
-
-                contentScale = ContentScale.Crop,
-
-                placeholder = painterResource(id = R.drawable.book_placeholder), // Usa seu PNG
-
-                error = painterResource(id = R.drawable.book_placeholder)
-
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Título do livro
-
             Text(
-
-                text = book.title ?: "Sem Título",
-
-                style = MaterialTheme.typography.bodySmall,
-
-                fontWeight = FontWeight.Medium,
-
-                maxLines = 2, // Limita a 2 linhas
-
-                overflow = TextOverflow.Ellipsis, // Adiciona "..." se for maior
-
-                textAlign = TextAlign.Center,
-
-                modifier = Modifier.padding(horizontal = 4.dp)
-
+                // ✅ CORREÇÃO: Texto dinâmico
+                text = if (isOwnProfile) "Sua estante está vazia. Adicione livros que você já leu!" else "Este usuário ainda não adicionou livros.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                textAlign = TextAlign.Center
             )
-
-            // Nota (Estrela + número)
-
-            Row(
-
-                verticalAlignment = Alignment.CenterVertically,
-
-                modifier = Modifier.padding(bottom = 6.dp, top = 2.dp)
-
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-
-                Icon(
-
-                    Icons.Filled.Star,
-
-                    contentDescription = "Nota",
-
-                    tint = MaterialTheme.colorScheme.primary, // Cor da estrela
-
-                    modifier = Modifier.size(14.dp) // Tamanho um pouco menor
-
-                )
-
-                Spacer(modifier = Modifier.width(2.dp))
-
-                Text(
-
-                    // Formata a nota para 1 casa decimal (ex: "4.5")
-
-                    text = String.format(Locale.US, "%.1f", book.rating),
-
-                    style = MaterialTheme.typography.labelSmall,
-
-                    fontSize = 11.sp
-
-                )
-
+                items(ratedBooks) { book ->
+                    RatedBookItem(
+                        book = book,
+                        onDeleteClick = { onDeleteBookClick(book) },
+                        isOwnProfile = isOwnProfile // ✅ CORREÇÃO: Passando para o item
+                    )
+                }
             }
-
         }
-
+        Spacer(modifier = Modifier.height(24.dp))
     }
-
 }
 
-
-
-// --- Diálogo de Confirmação de Exclusão --- (Coloque aqui ou em arquivo separado)
-
+// Item da Estante
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-
-fun DeleteConfirmationDialog(
-
-    bookTitle: String?,
-
-    onDismiss: () -> Unit,
-
-    onConfirm: () -> Unit
-
+fun RatedBookItem(
+    book: ProfileRatedBook,
+    onDeleteClick: () -> Unit,
+    isOwnProfile: Boolean, // ✅ CORREÇÃO: Parâmetro adicionado
+    modifier: Modifier = Modifier
 ) {
-
-    AlertDialog(
-
-        onDismissRequest = onDismiss,
-
-        title = { Text("Remover Livro") },
-
-        text = { Text("Tem certeza que deseja remover \"${bookTitle ?: "este livro"}\" da sua estante?") },
-
-        confirmButton = {
-
-            TextButton(onClick = onConfirm) {
-
-                Text("Remover", color = MaterialTheme.colorScheme.error) // Cor vermelha
-
+    Card(
+        modifier = modifier
+            .width(110.dp)
+            .combinedClickable(
+                onClick = { /* TODO: Ação de clique simples */ },
+                // ✅ CORREÇÃO: Só permite deletar se for o perfil do próprio usuário
+                onLongClick = if (isOwnProfile) onDeleteClick else null
+            ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            AsyncImage(
+                model = book.coverUrl?.ifEmpty { null },
+                contentDescription = book.title ?: "Capa do livro",
+                modifier = Modifier
+                    .height(150.dp)
+                    .fillMaxWidth(),
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(id = R.drawable.book_placeholder),
+                error = painterResource(id = R.drawable.book_placeholder)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = book.title ?: "Sem Título",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 6.dp, top = 2.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Star,
+                    contentDescription = "Nota",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(2.dp))
+                Text(
+                    text = String.format(Locale.US, "%.1f", book.rating),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 11.sp
+                )
             }
-
-        },
-
-        dismissButton = {
-
-            TextButton(onClick = onDismiss) {
-
-                Text("Cancelar")
-
-            }
-
         }
-
-    )
-
+    }
 }
-
-
-
-
 
 // --- PREVIEWS ---
-
-
+// (Os previews também precisam do novo parâmetro onSearchFriendsClick)
 
 @Preview(showBackground = true)
-
 @Composable
-
 fun ProfileScreenPreview() {
-
     LetrariaAppTheme {
-
         ProfileScreenContent(
-
-            user = sampleUser,
-
-            isOwnProfile = true, // Para o preview mostrar o botão "Adicionar"
-
+            user = sampleUser.copy(friendCount = 10),
+            isOwnProfile = true,
+            friendshipStatus = FriendshipStatus.SELF,
             clubs = sampleClubsList,
-
-            ratedBooks = sampleRatedBooks, // Usa a lista de exemplo
-
+            ratedBooks = sampleRatedBooks,
             onBackClick = {},
-
             onEditProfileClick = {},
-
-            onLogoutClick = {},
-
             onSettingsClick = {},
-
             onClubClick = {},
-
             onAddBookClick = {},
-
-            onDeleteBookClick = {} // Lambda vazio para o preview
-
+            onDeleteBookClick = {},
+            onSendFriendRequest = {},
+            onFriendsListClick = {},
+            onRemoveFriendRequest = {}
         )
-
     }
-
 }
 
+@Preview(showBackground = true, name = "Outro Perfil (Não Amigo)")
+@Composable
+fun OtherProfileScreenNotFriendPreview() {
+    LetrariaAppTheme {
+        ProfileScreenContent(
+            user = sampleUser.copy(name="Outro Usuário", friendCount = 5),
+            isOwnProfile = false,
+            friendshipStatus = FriendshipStatus.NOT_FRIENDS,
+            clubs = sampleClubsList.take(1),
+            ratedBooks = sampleRatedBooks.take(2),
+            onBackClick = {},
+            onEditProfileClick = {},
+            onSettingsClick = {},
+            onClubClick = {},
+            onAddBookClick = {},
+            onDeleteBookClick = {},
+            onSendFriendRequest = {},
+            onFriendsListClick = {},
+            onRemoveFriendRequest = {}
+        )
+    }
+}
 
+@Preview(showBackground = true, name = "Outro Perfil (Pedido Enviado)")
+@Composable
+fun OtherProfileScreenRequestSentPreview() {
+    LetrariaAppTheme {
+        ProfileScreenContent(
+            user = sampleUser.copy(name="Outro Usuário", friendCount = 5),
+            isOwnProfile = false,
+            friendshipStatus = FriendshipStatus.REQUEST_SENT,
+            clubs = sampleClubsList.take(1),
+            ratedBooks = sampleRatedBooks.take(2),
+            onBackClick = {},
+            onEditProfileClick = {},
+            onSettingsClick = {},
+            onClubClick = {},
+            onAddBookClick = {},
+            onDeleteBookClick = {},
+            onSendFriendRequest = {},
+            onFriendsListClick = {},
+            onRemoveFriendRequest = {}
+        )
+    }
+}
 
 @Preview
-
 @Composable
-
 fun RatedBookItemPreview() {
-
     LetrariaAppTheme {
-
         RatedBookItem(
-
             book = ProfileRatedBook(
-
                 title = "O Nome do Vento - Livro Muito Longo Mesmo",
-
-                coverUrl = null, // Testa o placeholder
-
+                coverUrl = null,
                 rating = 4.5f
-
             ),
-
-            onDeleteClick = {} // Lambda vazio para o preview
-
+            onDeleteClick = {},
+            isOwnProfile = true // ✅ CORREÇÃO: Adicionado ao Preview
         )
-
     }
-
 }
 
-
-
-@Preview
-
+@Preview(name = "RatedBookItem (Outro Perfil)")
 @Composable
-
-fun DeleteConfirmationDialogPreview() { // Preview para o diálogo de exclusão
-
+fun RatedBookItemOtherProfilePreview() {
     LetrariaAppTheme {
-
-        DeleteConfirmationDialog(bookTitle = "Nome do Livro", onDismiss = {}, onConfirm = {})
-
+        RatedBookItem(
+            book = ProfileRatedBook(
+                title = "O Nome do Vento",
+                coverUrl = null,
+                rating = 4.5f
+            ),
+            onDeleteClick = {},
+            isOwnProfile = false // ✅ CORREÇÃO: Testando sem permissão de delete
+        )
     }
-
 }
-

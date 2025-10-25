@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Locale
 
 class SearchUserViewModel : ViewModel() {
 
@@ -26,41 +27,43 @@ class SearchUserViewModel : ViewModel() {
      * @param query O nome (ou parte do nome) a ser buscado.
      */
     fun searchUsers(query: String) {
-        val trimmedQuery = query.trim() // Remove espaços extras
+        val trimmedQuery = query.trim()
         if (trimmedQuery.isBlank()) {
-            _searchState.value = SearchUserState.Idle // Não busca se a query estiver vazia
+            _searchState.value = SearchUserState.Idle
             return
         }
 
-        _searchState.value = SearchUserState.Loading // Define estado como carregando
-        val currentUserId = auth.currentUser?.uid // Pega o ID do usuário atual para excluí-lo dos resultados
+        // ✅ Converte a query do usuário para minúsculas
+        val lowerCaseQuery = trimmedQuery.lowercase(Locale.ROOT)
+
+        _searchState.value = SearchUserState.Loading
+        val currentUserId = auth.currentUser?.uid
 
         viewModelScope.launch {
             try {
-                // Query no Firestore: busca usuários cujo 'name' começa com a 'trimmedQuery'
-                // O caractere '\uf8ff' é um truque comum para pegar prefixos em queries do Firestore
+                // ✅ Query agora usa o campo 'name_lowercase'
                 val result = db.collection("users")
-                    .whereGreaterThanOrEqualTo("name", trimmedQuery)
-                    .whereLessThanOrEqualTo("name", trimmedQuery + '\uf8ff')
-                    .orderBy("name") // Ordena por nome
-                    .limit(20) // Limita a 20 resultados
+                    .whereGreaterThanOrEqualTo("name_lowercase", lowerCaseQuery)
+                    .whereLessThanOrEqualTo("name_lowercase", lowerCaseQuery + '\uf8ff')
+                    .orderBy("name_lowercase") // ✅ Ordena pelo novo campo
+                    .limit(20)
                     .get()
-                    .await() // Espera o resultado
+                    .await()
 
-                // Converte os documentos para objetos User e filtra o usuário atual
                 val users = result.toObjects(User::class.java).filter { it.uid != currentUserId }
 
-                // Define o estado com base nos resultados
                 if (users.isEmpty()) {
                     _searchState.value = SearchUserState.NoResults
                 } else {
                     _searchState.value = SearchUserState.Success(users)
                 }
-                Log.d("SearchUserVM", "Busca por '$trimmedQuery' retornou ${users.size} usuários.")
+                Log.d(
+                    "SearchUserVM",
+                    "Busca por '$lowerCaseQuery' retornou ${users.size} usuários."
+                )
 
             } catch (e: Exception) {
-                // Trata erros (rede, permissão do Firestore, etc.)
-                Log.e("SearchUserVM", "Erro ao buscar usuários por '$trimmedQuery'", e)
+                Log.e("SearchUserVM", "Erro ao buscar usuários por '$lowerCaseQuery'", e)
                 _searchState.value = SearchUserState.Error("Erro ao buscar usuários: ${e.message}")
             }
         }

@@ -1,5 +1,6 @@
 package br.com.letrariaapp.ui.features.club
 
+import androidx.compose.foundation.clickable // ✅ ADICIONADO
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,7 +39,8 @@ fun AdminScreen(
     onBackClick: () -> Unit,
     onLeaveClub: () -> Unit,
     onDrawUser: () -> Unit,
-    onEditClub: () -> Unit
+    onEditClub: () -> Unit,
+    onProfileClick: (String) -> Unit // ✅ ADICIONADO: Callback para navegar ao perfil
 ) {
     LaunchedEffect(clubId) {
         viewModel.loadAdminData(clubId)
@@ -65,8 +67,9 @@ fun AdminScreen(
         onKick = { member -> viewModel.kickMember(member.uid) },
         onLeaveClub = onLeaveClub,
         onDrawUser = onDrawUser,
-        onEditClub = onEditClub, // ✅ Passando o parâmetro recebido
-        onDeleteClub = { viewModel.deleteClub() } // ✅ Criando a lambda para deletar
+        onEditClub = onEditClub,
+        onDeleteClub = { viewModel.deleteClub() },
+        onProfileClick = onProfileClick // ✅ ATUALIZADO: Passando o callback
     )
 }
 
@@ -85,8 +88,9 @@ fun AdminScreenContent(
     onKick: (User) -> Unit,
     onLeaveClub: () -> Unit,
     onDrawUser: () -> Unit,
-    onEditClub: () -> Unit, // ✅ Recebendo o parâmetro
-    onDeleteClub: () -> Unit  // ✅ Recebendo o parâmetro
+    onEditClub: () -> Unit,
+    onDeleteClub: () -> Unit,
+    onProfileClick: (String) -> Unit // ✅ ADICIONADO: Recebendo o callback
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
 
@@ -124,15 +128,13 @@ fun AdminScreenContent(
 
                 if (isAdmin) {
                     when (selectedTabIndex) {
-                        0 -> RequestsTab(requests, isLoadingRequests, onApprove, onDeny)
-                        1 -> MembersTab(members, isLoadingMembers, club?.adminId, isAdmin, onKick)
-                        // ✅ Passando os novos parâmetros para a ConfigTab
+                        0 -> RequestsTab(requests, isLoadingRequests, onApprove, onDeny, onProfileClick) // ✅ ATUALIZADO
+                        1 -> MembersTab(members, isLoadingMembers, club?.adminId, isAdmin, onKick, onProfileClick) // ✅ ATUALIZADO
                         2 -> ConfigTab(club, isAdmin, onLeaveClub, onDrawUser, onEditClub, onDeleteClub)
                     }
                 } else {
                     when (selectedTabIndex) {
-                        0 -> MembersTab(members, isLoadingMembers, club?.adminId, isAdmin, onKick)
-                        // ✅ Passando os novos parâmetros para a ConfigTab
+                        0 -> MembersTab(members, isLoadingMembers, club?.adminId, isAdmin, onKick, onProfileClick) // ✅ ATUALIZADO
                         1 -> ConfigTab(club, isAdmin, onLeaveClub, onDrawUser, onEditClub, onDeleteClub)
                     }
                 }
@@ -147,7 +149,8 @@ fun RequestsTab(
     requests: List<JoinRequest>,
     isLoading: Boolean,
     onApprove: (JoinRequest) -> Unit,
-    onDeny: (JoinRequest) -> Unit
+    onDeny: (JoinRequest) -> Unit,
+    onProfileClick: (String) -> Unit // ✅ ADICIONADO
 ) {
     if (isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -166,7 +169,8 @@ fun RequestsTab(
                 RequestItem(
                     user = request.user,
                     onApprove = { onApprove(request) },
-                    onDeny = { onDeny(request) }
+                    onDeny = { onDeny(request) },
+                    onProfileClick = { onProfileClick(request.user.uid) } // ✅ ATUALIZADO
                 )
             }
         }
@@ -179,7 +183,8 @@ fun MembersTab(
     isLoading: Boolean,
     adminId: String?,
     currentUserIsAdmin: Boolean,
-    onKick: (User) -> Unit
+    onKick: (User) -> Unit,
+    onProfileClick: (String) -> Unit // ✅ ADICIONADO
 ) {
     if (isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -195,7 +200,8 @@ fun MembersTab(
                     user = user,
                     isThisMemberAdmin = user.uid == adminId,
                     currentUserIsAdmin = currentUserIsAdmin,
-                    onKick = { onKick(user) }
+                    onKick = { onKick(user) },
+                    onProfileClick = { onProfileClick(user.uid) } // ✅ ATUALIZADO
                 )
             }
         }
@@ -208,21 +214,20 @@ fun ConfigTab(
     isAdmin: Boolean,
     onLeaveClub: () -> Unit,
     onDrawUser: () -> Unit,
-    onEditClub: () -> Unit, // ✅ Recebendo o parâmetro
-    onDeleteClub: () -> Unit  // ✅ Recebendo o parâmetro
+    onEditClub: () -> Unit,
+    onDeleteClub: () -> Unit
 ) {
-    // ✅ Estado para controlar o diálogo de confirmação de exclusão
+    // ... (Código da ConfigTab não precisa de alteração) ...
     var showDeleteDialog by remember { mutableStateOf(false) }
-
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(16.dp)) {
         if (club == null) {
             CircularProgressIndicator()
             return
         }
-
         Text("Configurações do Clube", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(16.dp))
-
         if (club.code != null) {
             OutlinedTextField(
                 value = club.code,
@@ -233,28 +238,17 @@ fun ConfigTab(
             )
             Spacer(modifier = Modifier.height(16.dp))
         }
-
         if (isAdmin) {
-            Button(
-                onClick = onDrawUser,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Button(onClick = onDrawUser, modifier = Modifier.fillMaxWidth()) {
                 Text("Sortear Novo Usuário")
             }
-            Spacer(modifier = Modifier.height(16.dp)) // ✅ Espaçamento ajustado
-
-            // ✅ ---- BOTÃO DE EDITAR CLUBE ----
-            Button(
-                onClick = onEditClub,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onEditClub, modifier = Modifier.fillMaxWidth()) {
                 Text("EDITAR INFORMAÇÕES DO CLUBE")
             }
             Spacer(modifier = Modifier.height(8.dp))
-
-            // ✅ ---- BOTÃO DE DELETAR CLUBE ----
             Button(
-                onClick = { showDeleteDialog = true }, // Abre o diálogo
+                onClick = { showDeleteDialog = true },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) {
@@ -267,7 +261,6 @@ fun ConfigTab(
             )
             Spacer(modifier = Modifier.height(32.dp))
         }
-
         Button(
             onClick = onLeaveClub,
             modifier = Modifier.fillMaxWidth(),
@@ -286,8 +279,6 @@ fun ConfigTab(
             )
         }
     }
-
-    // ✅ ---- DIÁLOGO DE CONFIRMAÇÃO DE EXCLUSÃO ----
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -296,17 +287,13 @@ fun ConfigTab(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onDeleteClub() // Chama a função do ViewModel
+                        onDeleteClub()
                         showDeleteDialog = false
                     }
-                ) {
-                    Text("EXCLUIR")
-                }
+                ) { Text("EXCLUIR") }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("CANCELAR")
-                }
+                TextButton(onClick = { showDeleteDialog = false }) { Text("CANCELAR") }
             }
         )
     }
@@ -317,10 +304,13 @@ fun ConfigTab(
 fun RequestItem(
     user: User,
     onApprove: () -> Unit,
-    onDeny: () -> Unit
+    onDeny: () -> Unit,
+    onProfileClick: () -> Unit // ✅ ADICIONADO
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onProfileClick), // ✅ ATUALIZADO: Card clicável
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -330,7 +320,9 @@ fun RequestItem(
             AsyncImage(
                 model = user.profilePictureUrl.ifEmpty { R.drawable.ic_launcher_background },
                 contentDescription = "Foto de ${user.name}",
-                modifier = Modifier.size(50.dp).clip(CircleShape),
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape),
                 contentScale = ContentScale.Crop
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -351,10 +343,13 @@ fun MemberItem(
     user: User,
     isThisMemberAdmin: Boolean,
     currentUserIsAdmin: Boolean,
-    onKick: () -> Unit
+    onKick: () -> Unit,
+    onProfileClick: () -> Unit // ✅ ADICIONADO
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onProfileClick), // ✅ ATUALIZADO: Card clicável
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -364,7 +359,9 @@ fun MemberItem(
             AsyncImage(
                 model = user.profilePictureUrl.ifEmpty { R.drawable.ic_launcher_background },
                 contentDescription = "Foto de ${user.name}",
-                modifier = Modifier.size(50.dp).clip(CircleShape),
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape),
                 contentScale = ContentScale.Crop
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -387,6 +384,7 @@ fun MemberItem(
 @Preview(showBackground = true)
 @Composable
 fun AdminScreenPreview() {
+    // ... (Código do Preview não precisa de alteração) ...
     val requests = listOf(
         JoinRequest("1", sampleUser.copy(name = "Usuário 1")),
         JoinRequest("2", sampleUser.copy(name = "Usuário 2"))
@@ -411,8 +409,9 @@ fun AdminScreenPreview() {
             onKick = {},
             onLeaveClub = {},
             onDrawUser = {},
-            onEditClub = {}, // ✅ Atualizado no preview
-            onDeleteClub = {}  // ✅ Atualizado no preview
+            onEditClub = {},
+            onDeleteClub = {},
+            onProfileClick = {} // ✅ ATUALIZADO: Adicionado ao Preview
         )
     }
 }

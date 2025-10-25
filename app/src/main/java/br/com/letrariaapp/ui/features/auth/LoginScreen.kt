@@ -52,7 +52,7 @@ fun LoginScreen(
     val context = LocalContext.current
 
     // 1. O Launcher que espera o resultado da tela de login do Google
-    val launcher = rememberLauncherForActivityResult(
+    val googleAuthLauncher = rememberLauncherForActivityResult( // Renomeado para clareza
         contract = ActivityResultContracts.StartActivityForResult(),
         onResult = { result ->
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
@@ -104,11 +104,19 @@ fun LoginScreen(
         onLoginClick = { viewModel.login(email, password, onLoginSuccess) },
         onRegisterClick = onRegisterClick,
         onForgotPasswordClick = { viewModel.sendPasswordReset(email) },
-        // 6. Ação de clique para o botão do Google
+
+        // ⬇️ --- AÇÃO DE CLIQUE CORRIGIDA --- ⬇️
         onGoogleLoginClick = {
-            // Ao clicar, inicia a tela de login do Google
-            launcher.launch(googleSignInClient.signInIntent)
+            // 1. FAZ SIGN OUT DO CLIENTE GOOGLE (LIMPA O CACHE)
+            googleSignInClient.signOut().addOnCompleteListener {
+                // 2. DEPOIS DE LIMPAR, LANÇA A INTENÇÃO DE LOGIN
+                // Isso força a seleção de conta a aparecer.
+                val signInIntent = googleSignInClient.signInIntent
+                googleAuthLauncher.launch(signInIntent)
+            }
         },
+        // ⬆️ --- FIM DA CORREÇÃO --- ⬆️
+
         isLoading = authResult is AuthResult.LOADING
     )
 }
@@ -122,7 +130,7 @@ fun LoginScreenContent(
     onLoginClick: () -> Unit,
     onRegisterClick: () -> Unit,
     onForgotPasswordClick: () -> Unit,
-    onGoogleLoginClick: () -> Unit, // ✅ Novo parâmetro
+    onGoogleLoginClick: () -> Unit,
     isLoading: Boolean
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
@@ -130,7 +138,9 @@ fun LoginScreenContent(
     AppBackground(backgroundResId = R.drawable.app_background) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
@@ -140,7 +150,9 @@ fun LoginScreenContent(
                 )
                 Spacer(modifier = Modifier.height(100.dp))
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     OutlinedTextField(
@@ -187,7 +199,9 @@ fun LoginScreenContent(
                     Button(
                         onClick = onLoginClick,
                         enabled = !isLoading,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = ButtonRed)
                     ) {
@@ -202,9 +216,11 @@ fun LoginScreenContent(
                         Text("Não tem uma conta? Cadastre-se", color = TextColor)
                     }
 
-                    // ✅ --- SEPARADOR E BOTÃO DO GOOGLE ---
+                    // --- SEPARADOR E BOTÃO DO GOOGLE ---
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         HorizontalDivider(modifier = Modifier.weight(1f))
@@ -215,7 +231,9 @@ fun LoginScreenContent(
                     OutlinedButton(
                         onClick = onGoogleLoginClick,
                         enabled = !isLoading,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(1.dp, Color.Gray)
                     ) {
@@ -223,12 +241,11 @@ fun LoginScreenContent(
                             painter = painterResource(id = R.drawable.ic_google_logo),
                             contentDescription = "Logo do Google",
                             modifier = Modifier.size(24.dp),
-                            tint = Color.Unspecified // Importante para não pintar o logo do Google
+                            tint = Color.Unspecified
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Text("Entrar com Google", color = TextColor, fontWeight = FontWeight.Bold)
                     }
-                    // ✅ --- FIM DO BOTÃO ---
                 }
                 Spacer(modifier = Modifier.height(70.dp))
             }
@@ -246,7 +263,7 @@ fun LoginScreenPreview() {
                 password = "", onPasswordChange = {},
                 onLoginClick = {}, onRegisterClick = {},
                 onForgotPasswordClick = {},
-                onGoogleLoginClick = {}, // ✅ Adicionado ao Preview
+                onGoogleLoginClick = {},
                 isLoading = false
             )
         }

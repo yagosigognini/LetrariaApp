@@ -1,6 +1,6 @@
 package br.com.letrariaapp.ui.features.home
 
-// ... Imports normais
+// ... Todos os seus imports existentes ...
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
-// ... (Imports de Lógica de Atualização - MANTENHA-OS AQUI)
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -30,7 +29,6 @@ import com.google.firebase.ktx.Firebase
 import com.google.firebase.remoteconfig.ktx.remoteConfig
 import com.google.firebase.remoteconfig.ktx.remoteConfigSettings
 import kotlinx.coroutines.tasks.await
-// ---
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,16 +47,14 @@ import br.com.letrariaapp.data.User
 import br.com.letrariaapp.data.sampleClubsList
 import br.com.letrariaapp.data.sampleQuote
 import br.com.letrariaapp.data.sampleUser
-import br.com.letrariaapp.ui.components.AppBackground // ✅ Verifique se este import está correto
+import br.com.letrariaapp.ui.components.AppBackground
 import br.com.letrariaapp.ui.components.ClubsSection
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import coil.compose.AsyncImage
-
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.systemBars
 
-// Data class UpdateInfo (MANTENHA AQUI)
 private data class UpdateInfo(
     val versionName: String,
     val apkUrl: String
@@ -79,18 +75,20 @@ fun HomeScreen(
 ) {
     val user by viewModel.user.observeAsState()
     val clubs by viewModel.clubs.observeAsState(emptyList())
-    val context = LocalContext.current
 
+    // ✅ MUDANÇA 1: Observe a citação do dia vinda do ViewModel
+    val quote by viewModel.quoteOfTheDay.observeAsState(sampleQuote)
+
+    val context = LocalContext.current
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
 
-    // Lógica de Verificação de Atualização (MANTENHA AQUI)
+    // --- Lógica de Verificação de Atualização (NÃO MEXA AQUI) ---
     LaunchedEffect(Unit) {
         val remoteConfig = Firebase.remoteConfig
         val configSettings = remoteConfigSettings {
             minimumFetchIntervalInSeconds = if (BuildConfig.DEBUG) 0 else 3600
         }
         remoteConfig.setConfigSettingsAsync(configSettings)
-        // ... (resto da lógica de fetch e activate) ...
         remoteConfig.setDefaultsAsync(mapOf(
             "latest_version_code" to 1L,
             "latest_version_name" to "1.0",
@@ -134,11 +132,10 @@ fun HomeScreen(
         }
     }
 
-    // Mostra o Diálogo (MANTENHA AQUI)
     updateInfo?.let { info ->
         UpdateAvailableDialog(
             versionName = info.versionName,
-            onUpdateClick = { /* ... (lógica para abrir URL) ... */
+            onUpdateClick = {
                 try {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl))
                     context.startActivity(intent)
@@ -153,10 +150,12 @@ fun HomeScreen(
             }
         )
     }
+    // --- Fim da Lógica de Atualização ---
+
 
     HomeScreenContent(
         user = user,
-        quote = sampleQuote,
+        quote = quote, // ✅ MUDANÇA 2: Passe a citação do ViewModel aqui
         clubs = clubs,
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
@@ -167,6 +166,7 @@ fun HomeScreen(
 }
 
 // --- TELA "BURRA" (STATELESS) ---
+// (Nenhuma mudança necessária aqui)
 @Composable
 fun HomeScreenContent(
     user: User?,
@@ -178,8 +178,6 @@ fun HomeScreenContent(
     onJoinClubClick: () -> Unit,
     onClubClick: (BookClub) -> Unit
 ) {
-    // ✅ --- CORREÇÃO AQUI ---
-    // Voltando a usar backgroundResId com a imagem correta para esta tela
     AppBackground(backgroundResId = R.drawable.app_background) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -213,14 +211,12 @@ fun HomeScreenContent(
 
             item { Spacer(modifier = Modifier.height(24.dp)) }
             item { ActionButtons(onCreateClubClick, onJoinClubClick) }
-
-
         }
     }
 }
 
 // --- COMPONENTES ---
-// ... (HomeTopBar, QuoteSection, ActionButtons, EmptyClubsSection - Sem Mudanças) ...
+// (Nenhuma mudança necessária aqui)
 @Composable
 fun HomeTopBar(
     profileImageUrl: String?,
@@ -328,7 +324,7 @@ fun EmptyClubsSection() {
 }
 
 // --- PREVIEWS ---
-// ... (Previews - Sem Mudanças) ...
+// (Nenhuma mudança necessária aqui)
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
@@ -342,8 +338,6 @@ fun HomeScreenPreview() {
             onCreateClubClick = {},
             onJoinClubClick = {}
         ) {}
-        // ⚠️ TESTE TEMPORÁRIO
-
     }
 }
 
@@ -365,7 +359,7 @@ fun HomeScreenEmptyPreview() {
 }
 
 
-// Diálogo de Atualização (MANTENHA AQUI)
+// --- Diálogo de Atualização (Sem mudanças) ---
 @Composable
 private fun UpdateAvailableDialog(
     versionName: String,

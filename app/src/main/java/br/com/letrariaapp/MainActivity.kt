@@ -17,8 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import android.util.Log
-// ⚠️ REMOVIDO: import br.com.letrariaapp.data.Book
-import br.com.letrariaapp.data.BookItem // ⬇️ NOVO: Importar o BookItem (de GoogleBooksModels.kt)
+import br.com.letrariaapp.data.BookItem
 import br.com.letrariaapp.ui.features.home.HomeScreen
 import br.com.letrariaapp.ui.features.auth.AuthViewModel
 import br.com.letrariaapp.ui.features.auth.LoginScreen
@@ -35,6 +34,7 @@ import br.com.letrariaapp.ui.features.createclub.CreateClubResult
 import br.com.letrariaapp.ui.features.createclub.CreateClubScreen
 import br.com.letrariaapp.ui.features.createclub.CreateClubViewModel
 import br.com.letrariaapp.ui.features.profile.EditProfileScreen
+import br.com.letrariaapp.ui.features.friends.FriendsScreen
 import br.com.letrariaapp.ui.features.profile.ProfileScreen
 import br.com.letrariaapp.ui.features.profile.ProfileViewModel
 import br.com.letrariaapp.ui.features.profile.UpdateStatus
@@ -45,6 +45,7 @@ import br.com.letrariaapp.ui.features.search.SearchClubViewModel
 import br.com.letrariaapp.ui.features.settings.SettingsScreen
 import br.com.letrariaapp.ui.features.settings.SettingsViewModel
 import br.com.letrariaapp.ui.features.booksearch.BookSearchScreen
+import br.com.letrariaapp.ui.features.searchuser.SearchUserScreen
 import br.com.letrariaapp.ui.features.settings.TermsAndPoliciesScreen
 import br.com.letrariaapp.ui.theme.LetrariaAppTheme
 import com.google.firebase.auth.ktx.auth
@@ -137,23 +138,30 @@ fun AppNavigation() {
             }
             // --- FIM CÓDIGO RECEBIMENTO (PROFILE) ---
 
+            // ✅ Esta é a chamada que precisa ser corrigida
             ProfileScreen(
                 viewModel = profileViewModel,
                 userId = backStackEntry.arguments?.getString("userId"),
-                // 👇 PARÂMETROS QUE FALTAVAM REINSERIDOS 👇
+
+                // --- Callbacks de Navegação ---
                 onBackClick = { navController.popBackStack() },
                 onEditProfileClick = { navController.navigate("edit_profile") },
+
+                // ✅ LINHA QUE FALTAVA (ou estava incorreta)
                 onLogoutClick = {
                     authViewModel.logout()
                     navController.navigate("login") { popUpTo(0) }
                 },
+
                 onSettingsClick = { navController.navigate("settings") },
-                // 👆 FIM DOS PARÂMETROS REINSERIDOS 👆
                 onClubClick = { club ->
                     navController.navigate("club/${club.id}")
                 },
-                onAddBookClick = { // Navega para busca a partir do Profile
+                onAddBookClick = { // Navega para busca de livro
                     navController.navigate("book_search")
+                },
+                onFriendsListClick = { //
+                    navController.navigate("friends") // Navega para a tela de amigos
                 }
             )
         }
@@ -265,6 +273,11 @@ fun AppNavigation() {
                     is JoinClubResult.SUCCESS -> {
                         Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
                         detailsViewModel.resetJoinResult()
+                        navController.navigate("home") {
+                            popUpTo("home") { inclusive = true } // Se 'home' já estiver no stack
+                            popUpTo("search_club") { inclusive = true } // Remove a tela de busca
+                        }
+
                     }
                     is JoinClubResult.ERROR -> {
                         Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
@@ -375,7 +388,8 @@ fun AppNavigation() {
                     onBackClick = { navController.popBackStack() },
                     onLeaveClub = { adminViewModel.leaveClub() },
                     onDrawUser = { adminViewModel.drawUserForCycle() },
-                    onEditClub = { navController.navigate("edit_club/$clubId") }
+                    onEditClub = { navController.navigate("edit_club/$clubId") },
+                    onProfileClick = { userId -> navController.navigate("profile/$userId") }
                 )
             }
         }
@@ -421,5 +435,30 @@ fun AppNavigation() {
                 onBackClick = { navController.popBackStack() } // Ação de cancelar
             )
         }
+
+        composable("search_user") {
+            SearchUserScreen(
+                // O ViewModel é obtido automaticamente pelo compose-lifecycle
+                onUserClick = { userId ->
+                    // Navega para o perfil do usuário clicado
+                    navController.navigate("profile/$userId")
+                },
+                onBackClick = { navController.popBackStack() } // Volta para a tela anterior (Profile)
+            )
+        }
+
+        composable("friends") {
+            FriendsScreen(
+                viewModel = viewModel(),
+                onBackClick = { navController.popBackStack() },
+                onSearchUserClick = {
+                    navController.navigate("search_user")
+                },
+                onProfileClick = { userId ->
+                    navController.navigate("profile/$userId")
+                }
+            )
+        }
+
     }
 }

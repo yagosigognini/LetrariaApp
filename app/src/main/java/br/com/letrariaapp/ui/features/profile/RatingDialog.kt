@@ -54,6 +54,30 @@ fun RatingDialog(
     )
 }
 
+@Composable
+fun DeleteConfirmationDialog(
+    title: String, // Título (ex: "Remover Livro" ou "Remover Amigo")
+    text: String,  // Texto de confirmação
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(text) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Remover", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
 // Preview para testar o diálogo isoladamente
 @Preview
 @Composable

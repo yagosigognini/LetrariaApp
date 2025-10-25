@@ -5,8 +5,8 @@ data class User(
     val name: String = "",
     val email: String = "",
     val profilePictureUrl: String = "",
+    val coverPhotoUrl: String = "",
+    val name_lowercase: String = "",
     val aboutMe: String = "",
-    val friendCount: Long = 0, // Firestore prefere Long para números
-    val checklist: List<RatedBook> = emptyList(),
-    val clubs: List<BookClub> = emptyList()
+    val friendCount: Long = 0
 )
