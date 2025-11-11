@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.LetrariaApp" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.CapitularIA" parent="Theme.Material3.DayNight.NoActionBar">
 
         <!-- Primary brand color. -->
         <item name="colorPrimary">@color/primary_blue</item>
@@ -26,8 +26,8 @@
     </style>
 
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#FD8569</item> <item name="windowSplashScreenAnimatedIcon">@mipmap/letraria</item>
-        <item name="postSplashScreenTheme">@style/Theme.LetrariaApp</item>
+        <item name="windowSplashScreenBackground">#C3B7A4</item> <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.CapitularIA</item>
     </style>
 </resources>
 

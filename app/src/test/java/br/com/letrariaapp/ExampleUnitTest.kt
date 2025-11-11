@@ -1,4 +1,4 @@
-package br.com.letrariaapp
+package br.com.CapitularIA
 
 import org.junit.Test
 

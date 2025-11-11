@@ -7,6 +7,6 @@
 
     <activity
         android:id="@+id/main_activity_placeholder"
-        android:name="br.com.letrariaapp.MainActivity"
+        android:name="br.com.CapitularIA.MainActivity"
         android:label="MainActivity" />
 </navigation>

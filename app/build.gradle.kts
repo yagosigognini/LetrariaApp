@@ -1,4 +1,4 @@
-import java.util.Properties // ✅ Adicionado import
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -20,15 +20,15 @@ fun getLocalProperty(key: String, project: org.gradle.api.Project): String {
 
 
 android {
-    namespace = "br.com.letrariaapp"
+    namespace = "br.com.CapitularIA"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "br.com.letrariaapp"
+        applicationId = "br.com.CapitularIA"
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.4"
+        versionCode = 7
+        versionName = "1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

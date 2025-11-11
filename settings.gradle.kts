@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "LetrariaApp"
+rootProject.name = "CapitularIA"
 include(":app")
